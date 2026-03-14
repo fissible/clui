@@ -232,6 +232,32 @@ printf "%-20b" "${CLUI_GREEN}hello${CLUI_RESET}"
 printf '%b' "$(clui_pad_left "hello" "${CLUI_GREEN}hello${CLUI_RESET}" 20)"
 ```
 
+### 7. Command substitution `$()` pipes stdout away from the terminal
+
+Calling a TUI function as `result=$(my_tui)` creates a subshell where stdout
+is a pipe, not the terminal. All `printf` screen output silently disappears
+into the pipe and the UI never renders — the script just hangs on `read`.
+
+Fix: redirect stdout to `/dev/tty` inside the function for all display output,
+then restore the original stdout before printing the return value.
+
+```bash
+my_tui() {
+    local _orig_stdout
+    exec {_orig_stdout}>&1
+    exec 1>/dev/tty          # TUI output goes to the real terminal
+
+    # ... screen enter, draw loop, input loop ...
+
+    exec 1>&$_orig_stdout    # restore so the result is captured by $()
+    exec {_orig_stdout}>&-
+
+    printf '%s\n' "$result"  # this reaches the $() caller
+}
+
+chosen=$(my_tui)             # works correctly
+```
+
 ---
 
 ## File layout
