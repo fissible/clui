@@ -36,13 +36,31 @@
 #   as a regular character instead of a line terminator.
 
 # Pre-built key sequence constants for use with shellframe_read_key.
+# Arrow keys (3-byte CSI sequences)
 SHELLFRAME_KEY_UP=$'\x1b[A'
 SHELLFRAME_KEY_DOWN=$'\x1b[B'
 SHELLFRAME_KEY_RIGHT=$'\x1b[C'
 SHELLFRAME_KEY_LEFT=$'\x1b[D'
-SHELLFRAME_KEY_ENTER=$'\n'   # bash read converts \r→\n internally; use \n here
+# Common single-byte keys
+SHELLFRAME_KEY_ENTER=$'\n'    # bash read converts \r→\n internally; use \n here
 SHELLFRAME_KEY_SPACE=' '
 SHELLFRAME_KEY_ESC=$'\x1b'
+SHELLFRAME_KEY_TAB=$'\t'
+SHELLFRAME_KEY_BACKSPACE=$'\x7f'
+# Ctrl key combos (single-byte)
+SHELLFRAME_KEY_CTRL_A=$'\x01'
+SHELLFRAME_KEY_CTRL_E=$'\x05'
+SHELLFRAME_KEY_CTRL_K=$'\x0b'
+SHELLFRAME_KEY_CTRL_U=$'\x15'
+SHELLFRAME_KEY_CTRL_W=$'\x17'
+# 3-byte CSI sequences
+SHELLFRAME_KEY_SHIFT_TAB=$'\x1b[Z'
+SHELLFRAME_KEY_HOME=$'\x1b[H'
+SHELLFRAME_KEY_END=$'\x1b[F'
+# 4-byte CSI sequences: ESC [ <digit> ~
+SHELLFRAME_KEY_DELETE=$'\x1b[3~'
+SHELLFRAME_KEY_PAGE_UP=$'\x1b[5~'
+SHELLFRAME_KEY_PAGE_DOWN=$'\x1b[6~'
 
 # Read one keypress (including full escape sequences) into a variable.
 #
@@ -65,12 +83,18 @@ SHELLFRAME_KEY_ESC=$'\x1b'
 # follow-on bytes are already in the buffer and return immediately.
 shellframe_read_key() {
     local _out_var="${1:-_SHELLFRAME_KEY}"
-    local _k _c1 _c2
+    local _k _c1 _c2 _c3
     IFS= read -r -n1 -d '' _k
     if [[ "$_k" == $'\x1b' ]]; then
         IFS= read -r -n1 -d '' -t 1 _c1
         IFS= read -r -n1 -d '' -t 1 _c2
         _k+="${_c1}${_c2}"
+        # 4-byte sequences: ESC [ <digit> ~  (PgUp, PgDn, Delete, etc.)
+        # Glob [0-9] matches a single digit — bash 3.2 safe.
+        if [[ "$_c1" == '[' && "$_c2" == [0-9] ]]; then
+            IFS= read -r -n1 -d '' -t 1 _c3
+            _k+="${_c3}"
+        fi
     fi
     printf -v "$_out_var" '%s' "$_k"
 }

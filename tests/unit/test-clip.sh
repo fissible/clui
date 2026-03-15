@@ -46,10 +46,19 @@ shellframe_test_begin "str_clip: plain text — clip to exact length"
 assert_output "hello" shellframe_str_clip "hello world" "hello world" 5
 
 # ── shellframe_str_clip — ANSI rendered strings ────────────────────────────────
+#
+# These tests use hard-coded SGR escape sequences rather than tput-derived
+# SHELLFRAME_* constants. tput returns empty string when $TERM is unset
+# (e.g. inside Docker), which would collapse rendered strings to plain text
+# and make the ANSI code paths unreachable.
+
+_BOLD=$'\033[1m'
+_GREEN=$'\033[32m'
+_RESET=$'\033[0m'
 
 shellframe_test_begin "str_clip: ANSI rendered — fits, unchanged"
 raw="hi"
-rendered="${SHELLFRAME_BOLD}hi${SHELLFRAME_RESET}"
+rendered="${_BOLD}hi${_RESET}"
 result=$(shellframe_str_clip "$raw" "$rendered" 5)
 assert_eq "$rendered" "$result" "ANSI string fits — should be unchanged"
 
@@ -63,28 +72,25 @@ assert_eq "hello" "$result" "plain text clip — no reset appended"
 shellframe_test_begin "str_clip: ANSI rendered — clip appends reset to prevent color bleed"
 # ANSI-colored rendered: truncating mid-ANSI region must append reset.
 raw="hello world"
-rendered="${SHELLFRAME_GREEN}hello world${SHELLFRAME_RESET}"
+rendered="${_GREEN}hello world${_RESET}"
 result=$(shellframe_str_clip "$raw" "$rendered" 5)
-# Visible content should be "hello" + reset appended
-result_vis="${result//$SHELLFRAME_GREEN/}"
-result_vis="${result_vis//$SHELLFRAME_RESET/}"
-result_vis="${result_vis//$'\033[0m'/}"
+# Visible content should be "hello" (ANSI sequences stripped)
+result_vis="${result//$_GREEN/}"
+result_vis="${result_vis//$_RESET/}"
 assert_eq "hello" "$result_vis" "ANSI clip — visible content is 5 chars"
-# Reset must be present somewhere in result (color bleed prevention)
+# Reset must be present to prevent color bleed
 assert_contains "$result" $'\033[0m' "ANSI clip — reset appended"
 
 shellframe_test_begin "str_clip: ANSI rendered — ANSI before clip point preserved"
 # rendered: BOLD prefix + text; raw: just text
 # Clip at 3 chars: ESC sequence + first 3 chars of text + reset
 raw="abcde"
-rendered="${SHELLFRAME_BOLD}abcde${SHELLFRAME_RESET}"
+rendered="${_BOLD}abcde${_RESET}"
 result=$(shellframe_str_clip "$raw" "$rendered" 3)
-# Should have BOLD escape + "abc" + reset (clip injected + possible original reset bytes)
-# Key: result must contain "abc" and start with BOLD, not contain "de"
+# Key: result must contain "abc" and not contain "de"
 assert_contains "$result" "abc" "clip preserves leading ANSI and shows first 3 chars"
-result_no_ansi="${result//$SHELLFRAME_BOLD/}"
-result_no_ansi="${result_no_ansi//$SHELLFRAME_RESET/}"
-result_no_ansi="${result_no_ansi//$'\033[0m'/}"
+result_no_ansi="${result//$_BOLD/}"
+result_no_ansi="${result_no_ansi//$_RESET/}"
 assert_eq "abc" "$result_no_ansi" "clip visible content is exactly 3 chars"
 
 # ── shellframe_str_clip_ellipsis — no-op (string fits) ────────────────────────
@@ -134,9 +140,9 @@ assert_eq "toolong" "$result" "wider string not truncated"
 
 shellframe_test_begin "str_pad: ANSI rendered — width from raw"
 raw="hi"
-rendered="${SHELLFRAME_GREEN}hi${SHELLFRAME_RESET}"
+rendered="${_GREEN}hi${_RESET}"
 result=$(shellframe_str_pad "$raw" "$rendered" 5)
-expected="${SHELLFRAME_GREEN}hi${SHELLFRAME_RESET}   "
+expected="${_GREEN}hi${_RESET}   "
 assert_eq "$expected" "$result" "ANSI rendered padded by raw width"
 
 shellframe_test_summary

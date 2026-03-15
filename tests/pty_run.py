@@ -8,7 +8,10 @@ Usage:
     python3 tests/pty_run.py <script> [KEY ...]
 
 Keys:
-    UP DOWN LEFT RIGHT ENTER SPACE ESC   named keys
+    UP DOWN LEFT RIGHT                    arrow keys
+    ENTER SPACE ESC TAB SHIFT_TAB         common keys
+    BACKSPACE DELETE HOME END             editing keys
+    PAGE_UP PAGE_DOWN                     paging keys
     q, a, v, ...                          literal single characters
     \\x1b, \\r, \\n, ...                  hex escape sequences
 
@@ -33,13 +36,21 @@ import termios
 import time
 
 NAMED_KEYS = {
-    "UP":    b"\x1b[A",
-    "DOWN":  b"\x1b[B",
-    "RIGHT": b"\x1b[C",
-    "LEFT":  b"\x1b[D",
-    "ENTER": b"\r",
-    "SPACE": b" ",
-    "ESC":   b"\x1b",
+    "UP":        b"\x1b[A",
+    "DOWN":      b"\x1b[B",
+    "RIGHT":     b"\x1b[C",
+    "LEFT":      b"\x1b[D",
+    "ENTER":     b"\r",
+    "SPACE":     b" ",
+    "ESC":       b"\x1b",
+    "TAB":       b"\t",
+    "SHIFT_TAB": b"\x1b[Z",
+    "BACKSPACE": b"\x7f",
+    "DELETE":    b"\x1b[3~",
+    "HOME":      b"\x1b[H",
+    "END":       b"\x1b[F",
+    "PAGE_UP":   b"\x1b[5~",
+    "PAGE_DOWN": b"\x1b[6~",
 }
 
 ANSI_RE = re.compile(

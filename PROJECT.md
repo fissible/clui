@@ -38,9 +38,9 @@ Start every new session by reading this file. Update task status here when work 
 
 | # | Task                             | Effort | GH Issue | Status |
 |---|----------------------------------|--------|----------|--------|
-| 4 | Keyboard input mapping module    | M | [#4](https://github.com/fissible/shellframe/issues/4) | open |
+| 4 | Keyboard input mapping module    | M | [#4](https://github.com/fissible/shellframe/issues/4) | closed |
 | 5 | Selection model module           | S | [#5](https://github.com/fissible/shellframe/issues/5) | closed |
-| 6 | Cursor model module              | M | [#6](https://github.com/fissible/shellframe/issues/6) | open |
+| 6 | Cursor model module              | M | [#6](https://github.com/fissible/shellframe/issues/6) | closed |
 | 7 | Clipping and measurement helpers | S | [#7](https://github.com/fissible/shellframe/issues/7) | closed |
 
 ---
@@ -148,6 +148,8 @@ _Last updated: 2026-03-15_
 - PROJECT.md is the master tracking sheet; shellql/PLAN.md cross-references shellframe issues
 - Existing shellframe widgets (table, action-list, confirm, alert) are complete and tested
 - Phase 1 complete: #1 component contract, #2 layout contract, #3 focus model written to `docs/contracts/`
-- Phase 2 partial: #5 selection model (`src/selection.sh`) and #7 clipping helpers (`src/clip.sh`) complete and tested (70/70 assertions)
-- run.sh bug fixed: `local f` was outside a function (renamed to `local_f`)
-- **Next session: remaining Phase 2 — #4 keyboard input mapping module (M effort) and #6 cursor model (M effort). Both are code. Start with #4 as it builds on the existing `src/input.sh`.**
+- Phase 2 complete: #5 selection model, #7 clipping helpers, #4 keyboard input mapping, #6 cursor model (185/185 assertions)
+  - `src/input.sh` extended: added 14 key constants (Tab, Shift-Tab, Backspace, Ctrl-A/E/K/U/W, Home, End, PgUp, PgDn, Delete) and 4-byte ESC sequence support in `shellframe_read_key`
+  - `src/keymap.sh`: `shellframe_keyname`, `shellframe_keymap_bind/lookup`, `shellframe_keymap_default_nav/edit`
+  - `src/cursor.sh`: full text cursor model — init, move, insert, backspace, delete, kill ops
+- **Next session: Phase 3 primitives. All Phase 2 deps are satisfied. Start with #8 (Text primitive) and #9 (Box/Panel) — both depend only on #7 (clip.sh, done). #8 is smallest effort.**
