@@ -13,13 +13,19 @@
 # (replace PREFIX and FOO with your values):
 #
 #   PREFIX_FOO_type()      — print the widget type: action-list | confirm | alert
+#                            (called in a subshell — do not modify globals here)
 #   PREFIX_FOO_render()    — populate widget context globals before the widget runs
-#   PREFIX_FOO_EVENT()     — print the next screen name, or __QUIT__ to end the app
+#   PREFIX_FOO_EVENT()     — set _CLUI_APP_NEXT to the next screen name, or __QUIT__
+#                            (called directly — safe to modify application globals)
 #
 # Events per widget type:
 #   action-list  →  confirm (Enter)   |  quit (q)
 #   confirm      →  yes    (Y/Enter)  |  no   (N/Esc/q)
 #   alert        →  dismiss (any key)
+#
+# ── Output globals (set by event handlers) ────────────────────────────────────
+#
+#   _CLUI_APP_NEXT   set this to the next screen name inside every EVENT function
 #
 # ── Widget context globals (set in render hooks) ──────────────────────────────
 #
@@ -40,20 +46,21 @@
 #
 #   _myapp_ROOT_type()    { printf 'action-list'; }
 #   _myapp_ROOT_render()  { CLUI_AL_LABELS=(...); ...; _CLUI_APP_HINT="q quit"; }
-#   _myapp_ROOT_confirm() { printf 'CONFIRM'; }
-#   _myapp_ROOT_quit()    { printf '__QUIT__'; }
+#   _myapp_ROOT_confirm() { _CLUI_APP_NEXT="CONFIRM"; }
+#   _myapp_ROOT_quit()    { _CLUI_APP_NEXT="__QUIT__"; }
 #
 #   _myapp_CONFIRM_type()   { printf 'confirm'; }
 #   _myapp_CONFIRM_render() { _CLUI_APP_QUESTION="Apply?"; }
-#   _myapp_CONFIRM_yes()    { _do_work; printf 'DONE'; }
-#   _myapp_CONFIRM_no()     { printf 'ROOT'; }
+#   _myapp_CONFIRM_yes()    { _do_work; _CLUI_APP_NEXT="DONE"; }
+#   _myapp_CONFIRM_no()     { _CLUI_APP_NEXT="ROOT"; }
 #
 #   _myapp_DONE_type()      { printf 'alert'; }
 #   _myapp_DONE_render()    { _CLUI_APP_TITLE="Done"; }
-#   _myapp_DONE_dismiss()   { printf 'ROOT'; }
+#   _myapp_DONE_dismiss()   { _CLUI_APP_NEXT="ROOT"; }
 #
 #   clui_app "_myapp" "ROOT"
 
+_CLUI_APP_NEXT=""
 _CLUI_APP_DRAW_FN=""
 _CLUI_APP_KEY_FN=""
 _CLUI_APP_HINT=""
@@ -85,7 +92,7 @@ clui_app() {
         _CLUI_APP_TITLE=""
         _CLUI_APP_DETAILS=()
 
-        # Get screen type, run render hook
+        # Get screen type (pure — subshell OK), run render hook (direct — can mutate globals)
         local _type
         _type=$("${_prefix}_${_current}_type")
         "${_prefix}_${_current}_render"
@@ -118,10 +125,12 @@ clui_app() {
                 ;;
         esac
 
-        # Map rc → event name, call transition hook, advance to next screen
-        local _event _next
+        # Map rc → event name, call event handler directly (not in $() — safe to
+        # mutate globals).  Handler must set _CLUI_APP_NEXT to the next screen name.
+        local _event
         _event=$(_clui_app_event "$_type" "$_rc")
-        _next=$("${_prefix}_${_current}_${_event}")
-        _current="$_next"
+        _CLUI_APP_NEXT=""
+        "${_prefix}_${_current}_${_event}"
+        _current="$_CLUI_APP_NEXT"
     done
 }

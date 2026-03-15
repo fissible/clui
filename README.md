@@ -14,6 +14,10 @@ clean data to the caller.
   Source only what you need; widgets never implicitly depend on each other.
 - **Full UI lifecycle** — covers input gathering, selection, feedback, and output
   formatting. Every widget maps to a clear data shape (string, index, flag set).
+- **Two abstraction levels** — use widgets directly for simple one-off
+  interactions (`clui_confirm`, `clui_alert`), or declare a multi-screen
+  application with `clui_app`: define screens as function triples and let the
+  runtime own the session loop, widget dispatch, and transitions.
 - **Two audiences** — human-friendly keyboard behavior with discoverable footer
   hints; developer-friendly exit codes, namespaced globals, and stdout/tty split
   so widgets work correctly inside `$()` command substitution.
@@ -29,18 +33,31 @@ See [`CLAUDE.md`](CLAUDE.md) for the full development guidelines.
 
 ## Quick start
 
+**Single widget** — call a widget directly and read its exit code:
+
 ```bash
 source /path/to/clui/clui.sh
 
-clui_screen_enter
-clui_raw_enter
-clui_cursor_hide
+clui_confirm "Deploy to production?" "  api-server  restart" "  cache       flush"
+(( $? == 0 )) && deploy || echo "Cancelled."
+```
 
-# ... draw and loop ...
+**Multi-screen application** — declare screens as function triples, let
+`clui_app` drive the loop:
 
-clui_raw_exit "$saved_stty"
-clui_cursor_show
-clui_screen_exit
+```bash
+source /path/to/clui/clui.sh
+
+_app_ROOT_type()    { printf 'confirm'; }
+_app_ROOT_render()  { _CLUI_APP_QUESTION="Continue?"; }
+_app_ROOT_yes()     { _CLUI_APP_NEXT="DONE"; }
+_app_ROOT_no()      { _CLUI_APP_NEXT="__QUIT__"; }
+
+_app_DONE_type()    { printf 'alert'; }
+_app_DONE_render()  { _CLUI_APP_TITLE="All done."; }
+_app_DONE_dismiss() { _CLUI_APP_NEXT="__QUIT__"; }
+
+clui_app "_app" "ROOT"
 ```
 
 See [`examples/list-select.sh`](examples/list-select.sh) for a complete
@@ -193,73 +210,176 @@ See [`examples/alert.sh`](examples/alert.sh) for a complete demo.
 
 **`clui_app <prefix> [initial_screen]`**
 
-Application runtime. Drives a finite-state machine of screens, handling
-the render → widget → event → transition loop automatically. `initial_screen`
-defaults to `ROOT`.
+Declarative application runtime. Models a TUI application as a
+finite-state machine: screens are states, keypresses produce events,
+event handlers return the next screen name. `clui_app` owns the session
+loop — you declare the screens; it handles widget dispatch and transitions.
+`initial_screen` defaults to `ROOT`. Returns when any handler prints `__QUIT__`.
 
-Define your application by implementing these functions for each screen `FOO`:
+#### Screen functions
 
-| Function | Purpose |
-|---|---|
-| `PREFIX_FOO_type()` | Print widget type: `action-list` \| `confirm` \| `alert` |
-| `PREFIX_FOO_render()` | Populate widget context globals before the widget runs |
-| `PREFIX_FOO_EVENT()` | Print next screen name, or `__QUIT__` to exit |
+For each screen `FOO`, define three functions (replace `PREFIX` with your
+chosen prefix):
 
-Events per widget type: `action-list` → `confirm` / `quit`; `confirm` → `yes` / `no`; `alert` → `dismiss`.
+| Function | How it outputs | Purpose |
+|---|---|---|
+| `PREFIX_FOO_type()` | `printf` | One of: `action-list` \| `confirm` \| `alert` — called in a subshell, do not modify globals |
+| `PREFIX_FOO_render()` | *(assigns globals)* | Populate widget context globals; called directly, safe to mutate state |
+| `PREFIX_FOO_EVENT()` | `_CLUI_APP_NEXT=` | Set `_CLUI_APP_NEXT` to next screen name; called directly, safe to mutate state |
 
-Widget context globals (set in render hooks):
+**Events** each widget type produces:
+
+| Widget | rc=0 event | rc=1 event |
+|---|---|---|
+| `action-list` | `confirm` | `quit` |
+| `confirm` | `yes` | `no` |
+| `alert` | `dismiss` | — |
+
+#### Output global
+
+| Global | Set by | Purpose |
+|---|---|---|
+| `_CLUI_APP_NEXT` | `EVENT()` handlers | Next screen name (or `__QUIT__`). Reset to `""` before each event call. |
+
+Event handlers run in the **current shell** (not a subshell), so they can freely
+read and write application state globals alongside setting `_CLUI_APP_NEXT`.
+
+#### Widget context globals
+
+Set these in your `render()` hook. They are reset to empty before every
+`render()` call, so each screen starts from a clean slate.
 
 | Global | Widget | Purpose |
 |---|---|---|
-| `_CLUI_APP_DRAW_FN` | `action-list` | Row renderer callback name |
-| `_CLUI_APP_KEY_FN` | `action-list` | Extra key handler callback name |
-| `_CLUI_APP_HINT` | `action-list` | Footer hint text |
+| `_CLUI_APP_DRAW_FN` | `action-list` | Row renderer callback name (empty → built-in default) |
+| `_CLUI_APP_KEY_FN` | `action-list` | Extra key handler callback name (empty → none) |
+| `_CLUI_APP_HINT` | `action-list` | Footer hint text (empty → built-in default) |
 | `_CLUI_APP_QUESTION` | `confirm` | Question text |
 | `_CLUI_APP_TITLE` | `alert` | Title text |
 | `_CLUI_APP_DETAILS` | `confirm` + `alert` | Array of detail lines |
 
-```bash
-_myapp_ROOT_type()    { printf 'action-list'; }
-_myapp_ROOT_render()  { CLUI_AL_LABELS=(one two); CLUI_AL_ACTIONS=("go" "go");
-                        CLUI_AL_IDX=(0 0); _CLUI_APP_HINT="Enter confirm  q quit"; }
-_myapp_ROOT_confirm() { printf 'DONE'; }
-_myapp_ROOT_quit()    { printf '__QUIT__'; }
+#### Application context
 
-_myapp_DONE_type()    { printf 'alert'; }
-_myapp_DONE_render()  { _CLUI_APP_TITLE="Done!"; }
-_myapp_DONE_dismiss() { printf 'ROOT'; }
+Application-level state shared between screens (e.g. a pending-changes list,
+results from an apply step) is not managed by `clui_app`. Use your own
+module-level globals, by convention prefixed with your app name:
+
+```bash
+_MYAPP_PENDING=()   # populated by ROOT_confirm, consumed by CONFIRM_render
+_MYAPP_RESULTS=()   # populated by CONFIRM_yes, consumed by RESULT_render
+```
+
+#### Example
+
+```bash
+# Module-level context
+_MYAPP_RESULTS=()
+
+_myapp_ROOT_type()    { printf 'action-list'; }
+_myapp_ROOT_render()  {
+    CLUI_AL_LABELS=("task-a" "task-b")
+    CLUI_AL_ACTIONS=("nothing run" "nothing run")
+    CLUI_AL_IDX=(0 0)
+    _CLUI_APP_HINT="Space cycle  Enter confirm  q quit"
+}
+_myapp_ROOT_confirm() {
+    # check CLUI_AL_IDX for selections; if nothing selected, go back
+    _CLUI_APP_NEXT="CONFIRM"
+}
+_myapp_ROOT_quit() { _CLUI_APP_NEXT="__QUIT__"; }
+
+_myapp_CONFIRM_type()    { printf 'confirm'; }
+_myapp_CONFIRM_render()  { _CLUI_APP_QUESTION="Run selected tasks?"; }
+_myapp_CONFIRM_yes()     { _MYAPP_RESULTS=("task-a: ok" "task-b: ok"); _CLUI_APP_NEXT="RESULT"; }
+_myapp_CONFIRM_no()      { _CLUI_APP_NEXT="ROOT"; }
+
+_myapp_RESULT_type()     { printf 'alert'; }
+_myapp_RESULT_render()   { _CLUI_APP_TITLE="Done"; _CLUI_APP_DETAILS=("${_MYAPP_RESULTS[@]}"); }
+_myapp_RESULT_dismiss()  { _CLUI_APP_NEXT="ROOT"; }
 
 clui_app "_myapp" "ROOT"
 ```
 
+For a full real-world example see [`macbin/scripts`](https://github.com/fissible/macbin)
+— a three-screen app (action list → confirm → result alert) that manages
+symlinks in `~/bin`.
+
 
 ---
 
-## Recommended TUI skeleton
+## Recommended TUI skeletons
+
+### Application skeleton (`clui_app`)
+
+Use this for any multi-screen application. Define screens as function
+triples; `clui_app` manages the loop.
 
 ```bash
 source /path/to/clui/clui.sh
 
-my_tui() {
+# Module-level context globals shared between screens
+_APP_DATA=()
+
+# ── Screen: MAIN (action-list) ──────────────────────────────────────
+_app_MAIN_type()    { printf 'action-list'; }
+_app_MAIN_render()  {
+    CLUI_AL_LABELS=(...)
+    CLUI_AL_ACTIONS=(...)
+    CLUI_AL_IDX=(...)
+    _CLUI_APP_DRAW_FN="_app_draw_row"   # optional custom renderer
+    _CLUI_APP_HINT="Space cycle  Enter confirm  q quit"
+}
+_app_MAIN_confirm() { _CLUI_APP_NEXT="CONFIRM"; }   # or 'MAIN' if nothing selected
+_app_MAIN_quit()    { _CLUI_APP_NEXT="__QUIT__"; }
+
+# ── Screen: CONFIRM (yes/no modal) ─────────────────────────────────
+_app_CONFIRM_type()   { printf 'confirm'; }
+_app_CONFIRM_render() { _CLUI_APP_QUESTION="Apply changes?"; }
+_app_CONFIRM_yes()    { _app_apply; _CLUI_APP_NEXT="RESULT"; }
+_app_CONFIRM_no()     { _CLUI_APP_NEXT="MAIN"; }
+
+# ── Screen: RESULT (alert modal) ───────────────────────────────────
+_app_RESULT_type()    { printf 'alert'; }
+_app_RESULT_render()  { _CLUI_APP_TITLE="Done"; _CLUI_APP_DETAILS=("${_APP_DATA[@]}"); }
+_app_RESULT_dismiss() { _CLUI_APP_NEXT="MAIN"; }
+
+# ── Entry point ────────────────────────────────────────────────────
+my_app() {
+    clui_app "_app" "MAIN"
+}
+```
+
+### Custom widget skeleton
+
+Use this when building a new widget or a single-screen TUI that doesn't
+fit the three standard widget types.
+
+```bash
+source /path/to/clui/clui.sh
+
+my_widget() {
     # ── Setup ──────────────────────────────────────────────────────
     local saved_stty
     saved_stty=$(clui_raw_save)
+    exec 3>&1; exec 1>/dev/tty
 
     _exit() {
         clui_raw_exit "$saved_stty"
         clui_cursor_show
         clui_screen_exit
+        { exec 1>&3; } 2>/dev/null || true
+        { exec 3>&-; } 2>/dev/null || true
     }
     trap '_exit; exit 1' INT TERM
 
-    clui_screen_enter   # enter alternate screen (restores on exit)
-    clui_raw_enter      # raw mode: no echo, no line buffering
+    clui_screen_enter
+    clui_raw_enter
     clui_cursor_hide
 
     # ── Draw ───────────────────────────────────────────────────────
     _draw() {
         clui_screen_clear
-        # ... printf your UI here ...
+        # ... printf your UI here using ANSI escape sequences ...
     }
     _draw
 
@@ -280,6 +400,10 @@ my_tui() {
     _exit
 }
 ```
+
+> **Note:** The `exec 3>&1 / exec 1>/dev/tty` plumbing is required if this
+> widget may be called inside `$()` command substitution. See Lesson 9 in
+> Hard-won lessons.
 
 ---
 
@@ -413,7 +537,7 @@ This was verified empirically: `dd` correctly receives `\r` from the PTY
 (confirming `-icrnl` works), but bash's `read` returns `\n`. The behavior
 holds on bash 3.2 (macOS) in both PTY and real-terminal contexts.
 
-### 9. `exec fd_redirect 2>/dev/null` permanently silences stderr
+### 8. `exec fd_redirect 2>/dev/null` permanently silences stderr
 
 When `exec` is used without a command (to permanently redirect file
 descriptors), all redirections on the `exec` line are applied permanently to
@@ -439,7 +563,7 @@ input that never comes because the invisible prompt prevents the user from
 knowing they need to type), and any diagnostic `printf ... >&2` lines you add
 to debug the hang also disappear — which is what makes this bug hard to find.
 
-### 8. Command substitution `$()` pipes stdout away from the terminal
+### 9. Command substitution `$()` pipes stdout away from the terminal
 
 Calling a TUI function as `result=$(my_tui)` creates a subshell where stdout
 is a pipe, not the terminal. All `printf` screen output silently disappears

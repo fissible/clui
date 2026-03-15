@@ -61,7 +61,10 @@ clui_action_list() {
 
     # ── Cleanup ───────────────────────────────────────────────────────────
     CLUI_AL_SAVED_STTY=$(clui_raw_save)
-    CLUI_AL_SELECTED=0
+    # Clamp CLUI_AL_SELECTED to a valid row — do not reset to 0 so callers
+    # can preserve cursor position across multiple widget invocations.
+    (( CLUI_AL_SELECTED >= _n && _n > 0 )) && CLUI_AL_SELECTED=$(( _n - 1 )) || true
+    (( CLUI_AL_SELECTED < 0 )) && CLUI_AL_SELECTED=0 || true
 
     _al_exit() {
         clui_raw_exit "$CLUI_AL_SAVED_STTY"
