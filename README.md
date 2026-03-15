@@ -27,8 +27,6 @@ clean data to the caller.
 - **Cross-version tested** — a Docker-based test matrix runs the suite against
   bash 3.2, 4.4, and 5.x to catch portability regressions before they ship.
 
-See [`CLAUDE.md`](CLAUDE.md) for the full development guidelines.
-
 ---
 
 ## Quick start
@@ -67,542 +65,26 @@ working interactive list selector.
 
 ## API
 
-### `src/screen.sh`
-
-| Function | Description |
+| Module | Provides |
 |---|---|
-| `shellframe_screen_enter` | Switch to alternate screen buffer + clear |
-| `shellframe_screen_exit` | Restore original screen (undoes `shellframe_screen_enter`) |
-| `shellframe_screen_clear` | Clear screen + move cursor home (for redraws) |
-| `shellframe_cursor_hide` | Hide cursor (`\033[?25l`) |
-| `shellframe_cursor_show` | Show cursor (`\033[?25h`) |
-| `shellframe_raw_save` | Print current stty state (capture with `$(...)`) |
-| `shellframe_raw_enter` | Set raw terminal mode for the TUI session |
-| `shellframe_raw_exit "$saved"` | Restore terminal to saved stty state |
+| `src/screen.sh` | Alternate screen, cursor show/hide, raw mode, stty save/restore |
+| `src/input.sh` | `shellframe_read_key`, `SHELLFRAME_KEY_*` constants |
+| `src/draw.sh` | `shellframe_pad_left`, color constants |
+| `src/widgets/action-list.sh` | Full-screen interactive action list |
+| `src/widgets/confirm.sh` | Modal yes/no dialog |
+| `src/widgets/alert.sh` | Modal informational dismiss dialog |
+| `src/app.sh` | `shellframe_app` — declarative multi-screen FSM runtime |
 
-### `src/input.sh`
-
-| Symbol | Value | Description |
-|---|---|---|
-| `SHELLFRAME_KEY_UP` | `\x1b[A` | Up arrow |
-| `SHELLFRAME_KEY_DOWN` | `\x1b[B` | Down arrow |
-| `SHELLFRAME_KEY_RIGHT` | `\x1b[C` | Right arrow |
-| `SHELLFRAME_KEY_LEFT` | `\x1b[D` | Left arrow |
-| `SHELLFRAME_KEY_ENTER` | `\n` | Enter / Return (bash converts `\r`→`\n` internally) |
-| `SHELLFRAME_KEY_SPACE` | ` ` | Space |
-| `SHELLFRAME_KEY_ESC` | `\x1b` | Standalone Escape |
-
-**`shellframe_read_key <varname>`**
-
-Reads one keypress (including full escape sequences) into `$varname`.
-Call inside a `shellframe_raw_enter` session. Compare results against the
-`SHELLFRAME_KEY_*` constants using `[[ "$key" == "$SHELLFRAME_KEY_UP" ]]`.
-Uses `read -d ''` (NUL delimiter) so Enter (`\n`) is captured rather
-than consumed as the line terminator (see Lesson 7 in Hard-won Lessons).
-
-### `src/draw.sh`
-
-**`shellframe_pad_left <raw> <rendered> <width>`**
-
-Left-aligns `$rendered` in a column of `$width` *visible* characters.
-`$raw` must be the plain-text (no ANSI codes) equivalent of `$rendered`
-so its `${#raw}` byte count equals its visible character count.
-
-```bash
-local raw="~/bin/gflow"
-local rendered="${SHELLFRAME_GRAY}~/bin/${SHELLFRAME_RESET}${SHELLFRAME_BOLD}gflow${SHELLFRAME_RESET}"
-printf '%b' "$(shellframe_pad_left "$raw" "$rendered" 20)"
-```
-
-Color constants `SHELLFRAME_BOLD`, `SHELLFRAME_RESET`, `SHELLFRAME_GREEN`, `SHELLFRAME_RED`,
-`SHELLFRAME_PURPLE`, `SHELLFRAME_GRAY`, `SHELLFRAME_WHITE` are set via `tput` at source time.
-
-### `src/widgets/action-list.sh`
-
-**`shellframe_action_list [draw_row_fn] [extra_key_fn] [footer_text]`**
-
-Full-screen interactive list where each row has a set of named actions the
-user cycles through. Returns 0 on confirm, 1 on quit.
-
-**Caller sets globals before calling:**
-
-| Global | Description |
-|---|---|
-| `SHELLFRAME_AL_LABELS[@]` | Display label per row |
-| `SHELLFRAME_AL_ACTIONS[@]` | Space-separated action list per row (e.g. `"nothing install"`) |
-| `SHELLFRAME_AL_IDX[@]` | Current action index per row (init to 0) |
-| `SHELLFRAME_AL_META[@]` | Optional per-row metadata string passed to callbacks |
-
-**Widget sets globals (readable from callbacks):**
-
-| Global | Description |
-|---|---|
-| `SHELLFRAME_AL_SELECTED` | Index of the currently highlighted row |
-| `SHELLFRAME_AL_SAVED_STTY` | Saved stty state — use with `shellframe_raw_exit` in `extra_key_fn` |
-
-**Built-in key bindings:** `↑`/`↓` move, `Space`/`→` cycle action, `Enter`/`c` confirm, `q` quit.
-
-**draw_row_fn** signature: `draw_row_fn "$i" "$label" "$acts_str" "$aidx" "$meta"`
-Must print one complete line (with `\n`). `SHELLFRAME_AL_SELECTED` is set globally.
-
-**extra_key_fn** signature: `extra_key_fn "$key"`
-Called for unhandled keys. Return 0=handled+redraw, 1=not handled, 2=quit.
-Use `SHELLFRAME_AL_SAVED_STTY` to suspend the TUI (e.g. to run a pager).
-
-See [`examples/action-list.sh`](examples/action-list.sh) for a complete demo.
-
-### `src/widgets/confirm.sh`
-
-**`shellframe_confirm <question> [detail ...]`**
-
-Centered modal yes/no dialog. Optional plain-text `detail` lines are shown
-above the question (e.g. a summary of pending changes). Returns 0 for Yes,
-1 for No or cancel.
-
-| Key | Action |
-|---|---|
-| `←`/`→`  `h`/`l` | Toggle between Yes and No |
-| `y` / `Y` | Select Yes and confirm immediately |
-| `n` / `N` | Select No and confirm immediately |
-| `Enter` / `c` | Confirm current selection (default: Yes) |
-| `Esc` / `q` / `Q` | Cancel (same as No) |
-
-```bash
-shellframe_confirm "Apply 3 pending changes?" \
-    "  config.json   delete" \
-    "  main.sh       install"
-
-if (( $? == 0 )); then
-    echo "applying..."
-fi
-```
-
-See [`examples/confirm.sh`](examples/confirm.sh) for a complete demo.
-
+→ **[Full API reference](docs/api.md)**
 
 ---
 
-### `src/widgets/alert.sh`
-
-**`shellframe_alert <title> [detail ...]`**
-
-Centered informational modal. Shows a bold `title` heading and optional
-plain-text `detail` lines. Any keypress dismisses it. Always returns 0.
-
-| Key | Action |
-|---|---|
-| Any key | Dismiss |
-
-```bash
-shellframe_alert "Deploy complete" \
-    "web-server    restarted" \
-    "cache         flushed"
-
-echo "Back in the shell."
-```
-
-See [`examples/alert.sh`](examples/alert.sh) for a complete demo.
-
-
----
-
-### `src/app.sh`
-
-**`shellframe_app <prefix> [initial_screen]`**
-
-Declarative application runtime. Models a TUI application as a
-finite-state machine: screens are states, keypresses produce events,
-event handlers return the next screen name. `shellframe_app` owns the session
-loop — you declare the screens; it handles widget dispatch and transitions.
-`initial_screen` defaults to `ROOT`. Returns when any handler prints `__QUIT__`.
-
-#### Screen functions
-
-For each screen `FOO`, define three functions (replace `PREFIX` with your
-chosen prefix):
-
-| Function | How it outputs | Purpose |
-|---|---|---|
-| `PREFIX_FOO_type()` | `printf` | One of: `action-list` \| `confirm` \| `alert` — called in a subshell, do not modify globals |
-| `PREFIX_FOO_render()` | *(assigns globals)* | Populate widget context globals; called directly, safe to mutate state |
-| `PREFIX_FOO_EVENT()` | `_SHELLFRAME_APP_NEXT=` | Set `_SHELLFRAME_APP_NEXT` to next screen name; called directly, safe to mutate state |
-
-**Events** each widget type produces:
-
-| Widget | rc=0 event | rc=1 event |
-|---|---|---|
-| `action-list` | `confirm` | `quit` |
-| `confirm` | `yes` | `no` |
-| `alert` | `dismiss` | — |
-
-#### Output global
-
-| Global | Set by | Purpose |
-|---|---|---|
-| `_SHELLFRAME_APP_NEXT` | `EVENT()` handlers | Next screen name (or `__QUIT__`). Reset to `""` before each event call. |
-
-Event handlers run in the **current shell** (not a subshell), so they can freely
-read and write application state globals alongside setting `_SHELLFRAME_APP_NEXT`.
-
-#### Widget context globals
-
-Set these in your `render()` hook. They are reset to empty before every
-`render()` call, so each screen starts from a clean slate.
-
-| Global | Widget | Purpose |
-|---|---|---|
-| `_SHELLFRAME_APP_DRAW_FN` | `action-list` | Row renderer callback name (empty → built-in default) |
-| `_SHELLFRAME_APP_KEY_FN` | `action-list` | Extra key handler callback name (empty → none) |
-| `_SHELLFRAME_APP_HINT` | `action-list` | Footer hint text (empty → built-in default) |
-| `_SHELLFRAME_APP_QUESTION` | `confirm` | Question text |
-| `_SHELLFRAME_APP_TITLE` | `alert` | Title text |
-| `_SHELLFRAME_APP_DETAILS` | `confirm` + `alert` | Array of detail lines |
-
-#### Application context
-
-Application-level state shared between screens (e.g. a pending-changes list,
-results from an apply step) is not managed by `shellframe_app`. Use your own
-module-level globals, by convention prefixed with your app name:
-
-```bash
-_MYAPP_PENDING=()   # populated by ROOT_confirm, consumed by CONFIRM_render
-_MYAPP_RESULTS=()   # populated by CONFIRM_yes, consumed by RESULT_render
-```
-
-#### Example
-
-```bash
-# Module-level context
-_MYAPP_RESULTS=()
-
-_myapp_ROOT_type()    { printf 'action-list'; }
-_myapp_ROOT_render()  {
-    SHELLFRAME_AL_LABELS=("task-a" "task-b")
-    SHELLFRAME_AL_ACTIONS=("nothing run" "nothing run")
-    SHELLFRAME_AL_IDX=(0 0)
-    _SHELLFRAME_APP_HINT="Space cycle  Enter confirm  q quit"
-}
-_myapp_ROOT_confirm() {
-    # check SHELLFRAME_AL_IDX for selections; if nothing selected, go back
-    _SHELLFRAME_APP_NEXT="CONFIRM"
-}
-_myapp_ROOT_quit() { _SHELLFRAME_APP_NEXT="__QUIT__"; }
-
-_myapp_CONFIRM_type()    { printf 'confirm'; }
-_myapp_CONFIRM_render()  { _SHELLFRAME_APP_QUESTION="Run selected tasks?"; }
-_myapp_CONFIRM_yes()     { _MYAPP_RESULTS=("task-a: ok" "task-b: ok"); _SHELLFRAME_APP_NEXT="RESULT"; }
-_myapp_CONFIRM_no()      { _SHELLFRAME_APP_NEXT="ROOT"; }
-
-_myapp_RESULT_type()     { printf 'alert'; }
-_myapp_RESULT_render()   { _SHELLFRAME_APP_TITLE="Done"; _SHELLFRAME_APP_DETAILS=("${_MYAPP_RESULTS[@]}"); }
-_myapp_RESULT_dismiss()  { _SHELLFRAME_APP_NEXT="ROOT"; }
-
-shellframe_app "_myapp" "ROOT"
-```
-
-For a full real-world example see [`macbin/scripts`](https://github.com/fissible/macbin)
-— a three-screen app (action list → confirm → result alert) that manages
-symlinks in `~/bin`.
-
-
----
-
-## Recommended TUI skeletons
-
-### Application skeleton (`shellframe_app`)
-
-Use this for any multi-screen application. Define screens as function
-triples; `shellframe_app` manages the loop.
-
-```bash
-source /path/to/shellframe/shellframe.sh
-
-# Module-level context globals shared between screens
-_APP_DATA=()
-
-# ── Screen: MAIN (action-list) ──────────────────────────────────────
-_app_MAIN_type()    { printf 'action-list'; }
-_app_MAIN_render()  {
-    SHELLFRAME_AL_LABELS=(...)
-    SHELLFRAME_AL_ACTIONS=(...)
-    SHELLFRAME_AL_IDX=(...)
-    _SHELLFRAME_APP_DRAW_FN="_app_draw_row"   # optional custom renderer
-    _SHELLFRAME_APP_HINT="Space cycle  Enter confirm  q quit"
-}
-_app_MAIN_confirm() { _SHELLFRAME_APP_NEXT="CONFIRM"; }   # or 'MAIN' if nothing selected
-_app_MAIN_quit()    { _SHELLFRAME_APP_NEXT="__QUIT__"; }
-
-# ── Screen: CONFIRM (yes/no modal) ─────────────────────────────────
-_app_CONFIRM_type()   { printf 'confirm'; }
-_app_CONFIRM_render() { _SHELLFRAME_APP_QUESTION="Apply changes?"; }
-_app_CONFIRM_yes()    { _app_apply; _SHELLFRAME_APP_NEXT="RESULT"; }
-_app_CONFIRM_no()     { _SHELLFRAME_APP_NEXT="MAIN"; }
-
-# ── Screen: RESULT (alert modal) ───────────────────────────────────
-_app_RESULT_type()    { printf 'alert'; }
-_app_RESULT_render()  { _SHELLFRAME_APP_TITLE="Done"; _SHELLFRAME_APP_DETAILS=("${_APP_DATA[@]}"); }
-_app_RESULT_dismiss() { _SHELLFRAME_APP_NEXT="MAIN"; }
-
-# ── Entry point ────────────────────────────────────────────────────
-my_app() {
-    shellframe_app "_app" "MAIN"
-}
-```
-
-### Custom widget skeleton
-
-Use this when building a new widget or a single-screen TUI that doesn't
-fit the three standard widget types.
-
-```bash
-source /path/to/shellframe/shellframe.sh
-
-my_widget() {
-    # ── Setup ──────────────────────────────────────────────────────
-    local saved_stty
-    saved_stty=$(shellframe_raw_save)
-    exec 3>&1; exec 1>/dev/tty
-
-    _exit() {
-        shellframe_raw_exit "$saved_stty"
-        shellframe_cursor_show
-        shellframe_screen_exit
-        { exec 1>&3; } 2>/dev/null || true
-        { exec 3>&-; } 2>/dev/null || true
-    }
-    trap '_exit; exit 1' INT TERM
-
-    shellframe_screen_enter
-    shellframe_raw_enter
-    shellframe_cursor_hide
-
-    # ── Draw ───────────────────────────────────────────────────────
-    _draw() {
-        shellframe_screen_clear
-        # ... printf your UI here using ANSI escape sequences ...
-    }
-    _draw
-
-    # ── Input loop ─────────────────────────────────────────────────
-    local key
-    while true; do
-        shellframe_read_key key
-        if   [[ "$key" == "$SHELLFRAME_KEY_UP"    ]]; then : # handle up
-        elif [[ "$key" == "$SHELLFRAME_KEY_DOWN"  ]]; then : # handle down
-        elif [[ "$key" == "$SHELLFRAME_KEY_ENTER" ]]; then break
-        elif [[ "$key" == 'q' ]]; then break
-        fi
-        _draw
-    done
-
-    # ── Teardown ───────────────────────────────────────────────────
-    trap - INT TERM
-    _exit
-}
-```
-
-> **Note:** The `exec 3>&1 / exec 1>/dev/tty` plumbing is required if this
-> widget may be called inside `$()` command substitution. See Lesson 9 in
-> Hard-won lessons.
-
----
-
-## Hard-won lessons
-
-These are the bugs that took iteration to find. Document them so they aren't
-rediscovered.
-
-### 1. `read -t` requires integers on bash 3.2 (macOS)
-
-macOS ships bash 3.2 (GPL licensing). Decimal timeouts like `read -t 0.1`
-produce `read: 0.1: invalid timeout specification` and fail silently.
-**Use `-t 1` (integer).** For arrow keys this is fine — the follow-on `[A`/`[B`
-bytes are already in the buffer when the second `read` fires, so `-t 1` is
-never actually reached. It only matters for standalone ESC detection.
-
-```bash
-# ✗ breaks on bash 3.2
-IFS= read -r -n1 -t 0.1 next
-
-# ✓ works everywhere
-IFS= read -r -n1 -t 1 next
-```
-
-### 2. `case '[A')` is a glob, not a string
-
-In bash `case` patterns, `[A` begins a bracket expression (like in globs and
-`[[ ]]`). Without a closing `]`, the behavior is undefined and in practice the
-pattern often matches nothing useful. Store sequences in variables and compare
-with `[[ "$key" == "$var" ]]` for exact matching.
-
-```bash
-# ✗ — [A is a bracket expression
-case "$key" in
-    $'\x1b[A') echo up ;;
-esac
-
-# ✓ — exact string comparison
-local K_UP=$'\x1b[A'
-if [[ "$key" == "$K_UP" ]]; then echo up; fi
-```
-
-### 3. `read -s` is per-call, not per-session
-
-`read -s` suppresses echo only while that `read` call is executing. The moment
-it returns, the terminal is back to echoing mode. If the next bytes of an
-escape sequence arrive between two `read` calls they echo visibly (you'll see
-`[B` appear on screen). Use `stty -echo` to suppress echo for the whole
-session.
-
-```bash
-# ✗ — echo suppressed only during read
-while true; do IFS= read -rsn1 key; ...; done
-
-# ✓ — echo suppressed for the entire loop
-stty -echo -icanon min 1 time 0
-while true; do IFS= read -r -n1 key; ...; done
-stty "$saved"
-```
-
-### 4. `read -n2` with `stty min 1` returns after 1 byte
-
-`stty min 1 time 0` tells the OS to return from `read()` as soon as at least
-1 byte is available. bash's `read -nN` reads *at most* N characters, so
-`read -n2` may satisfy itself with just 1 byte. Read escape sequences one byte
-at a time with `read -n1`.
-
-```bash
-# ✗ — may only read '[', leaves 'A' in buffer
-IFS= read -r -n2 -t 1 rest
-
-# ✓ — reads exactly 1 byte each call
-IFS= read -r -n1 -t 1 c1
-IFS= read -r -n1 -t 1 c2
-```
-
-### 5. Use raw sequences, not `tput smcup`/`rmcup`
-
-`tput smcup` and `tput rmcup` depend on the terminfo database and can exit 0
-without producing output when `$TERM` is unset or unrecognized. The raw ANSI
-sequences are universally supported by modern terminal emulators.
-
-```bash
-# ✗ — may silently do nothing
-tput smcup
-tput rmcup
-
-# ✓ — always works in VT100-compatible terminals
-printf '\033[?1049h'   # enter alternate screen
-printf '\033[?1049l'   # exit alternate screen
-```
-
-### 6. ANSI codes inflate byte counts for printf width padding
-
-`printf "%-20s"` measures field width in bytes. An ANSI reset sequence like
-`\033[0m` adds 4 bytes of width with 0 visible characters. Colored strings
-come out under-padded. Keep a plain-text `raw` copy of every colored string
-and use its `${#raw}` length to compute padding manually.
-
-```bash
-# ✗ — padding is too short because ANSI bytes inflate the measurement
-printf "%-20b" "${SHELLFRAME_GREEN}hello${SHELLFRAME_RESET}"
-
-# ✓ — measure raw, output rendered + explicit padding
-printf '%b' "$(shellframe_pad_left "hello" "${SHELLFRAME_GREEN}hello${SHELLFRAME_RESET}" 20)"
-```
-
-### 7. bash `read` converts `\r` to `\n` internally — use `read -d ''` for Enter
-
-Even with `stty -icrnl` set (so the PTY line discipline does NOT translate
-CR→LF), bash's own `read` builtin converts `\r` (0x0D) to `\n` (0x0A) before
-storing the result. The consequence:
-
-- `IFS= read -r -n1 key` with default `\n` delimiter: `\r` → `\n` → delimiter
-  → `key` is empty (the delimiter is consumed, not stored).
-- The fix is `read -d ''` (NUL delimiter), so `\n` is not the stop character
-  and is captured as the key value.
-- Set `SHELLFRAME_KEY_ENTER=$'\n'`, not `$'\r'`.
-
-```bash
-# ✗ — Enter becomes the delimiter; key is always empty on Enter
-IFS= read -r -n1 key
-[[ "$key" == $'\r' ]]  # never matches
-
-# ✓ — NUL delimiter; \n (from bash's \r→\n conversion) is stored in key
-IFS= read -r -n1 -d '' key
-[[ "$key" == $'\n' ]]  # matches Enter
-```
-
-This was verified empirically: `dd` correctly receives `\r` from the PTY
-(confirming `-icrnl` works), but bash's `read` returns `\n`. The behavior
-holds on bash 3.2 (macOS) in both PTY and real-terminal contexts.
-
-### 8. `exec fd_redirect 2>/dev/null` permanently silences stderr
-
-When `exec` is used without a command (to permanently redirect file
-descriptors), all redirections on the `exec` line are applied permanently to
-the shell process — including `2>/dev/null`. This is not a "suppress errors
-from this one command" guard; it destroys stderr for all future code in the
-process.
-
-This matters whenever a TUI function restores stdout from a saved fd. The
-`2>/dev/null` is typically added to suppress "bad file descriptor" noise if
-the saved fd is somehow invalid, but it silently breaks all subsequent
-`read -p` prompts, `printf >&2` output, and anything else that writes to fd 2.
-
-```bash
-# ✗ — permanently redirects fd 2 to /dev/null for the rest of the shell
-exec 1>&3  2>/dev/null || true   # stderr is now gone for the caller too
-
-# ✓ — wrap in a compound command to scope the error suppression
-{ exec 1>&3; } 2>/dev/null || true   # stderr is restored after the { } block
-```
-
-The symptom is subtle: `read -p "prompt"` appears to hang (it's waiting for
-input that never comes because the invisible prompt prevents the user from
-knowing they need to type), and any diagnostic `printf ... >&2` lines you add
-to debug the hang also disappear — which is what makes this bug hard to find.
-
-### 9. Command substitution `$()` pipes stdout away from the terminal
-
-Calling a TUI function as `result=$(my_tui)` creates a subshell where stdout
-is a pipe, not the terminal. All `printf` screen output silently disappears
-into the pipe and the UI never renders — the script just hangs on `read`.
-
-Fix: redirect stdout to `/dev/tty` inside the function for all display output,
-then restore the original stdout before printing the return value.
-
-```bash
-my_tui() {
-    # Use fixed fd 3; {varname} fd allocation requires bash 4.1+ (macOS has 3.2)
-    exec 3>&1
-    exec 1>/dev/tty          # TUI output goes to the real terminal
-
-    # ... screen enter, draw loop, input loop ...
-
-    exec 1>&3                # restore so the result is captured by $()
-    exec 3>&-
-
-    printf '%s\n' "$result"  # this reaches the $() caller
-}
-
-chosen=$(my_tui)             # works correctly
-```
-
----
-
-## Portability
-
-The key known portability difference is bash 3.2 (macOS default): no decimal
-`-t` timeouts, no `{varname}` fd allocation, and subtly different `read`
-behavior — all documented in [Hard-won lessons](#hard-won-lessons).
-
-To test against multiple bash versions locally, use the Docker matrix:
-
-```bash
-bash tests/docker/run-matrix.sh           # bash 3.2, 4.4, 5.x
-bash tests/docker/run-matrix.sh --no-cache  # force clean rebuild
-```
+## Going deeper
+
+- [**API reference**](docs/api.md) — every function, global, and callback signature
+- [**TUI skeletons**](docs/skeletons.md) — copy-paste starting points for apps and custom widgets
+- [**Hard-won lessons**](docs/hard-won-lessons.md) — 9 bash TUI pitfalls and how to avoid them
+- [**CLAUDE.md**](CLAUDE.md) — development guidelines and coding conventions
 
 ---
 
@@ -611,36 +93,44 @@ bash tests/docker/run-matrix.sh --no-cache  # force clean rebuild
 ```
 shellframe/
 ├── shellframe.sh          # entry point — source this
-├── .dockerignore    # excludes .git and .toolrc.local from Docker builds
 ├── src/
-│   ├── screen.sh    # alternate screen, cursor, stty
-│   ├── input.sh     # key reading + SHELLFRAME_KEY_* constants
-│   ├── draw.sh      # shellframe_pad_left, color constants
-│   ├── app.sh       # shellframe_app — declarative screen FSM runtime
+│   ├── screen.sh          # alternate screen, cursor, stty
+│   ├── input.sh           # key reading + SHELLFRAME_KEY_* constants
+│   ├── draw.sh            # shellframe_pad_left, color constants
+│   ├── app.sh             # shellframe_app — declarative screen FSM runtime
 │   └── widgets/
-│       ├── action-list.sh  # interactive action-list widget
-│       ├── confirm.sh      # modal yes/no confirmation dialog
-│       └── alert.sh        # modal informational dialog (dismiss-only)
+│       ├── action-list.sh # interactive action-list widget
+│       ├── confirm.sh     # modal yes/no confirmation dialog
+│       └── alert.sh       # modal informational dialog (dismiss-only)
+├── docs/
+│   ├── api.md             # full API reference
+│   ├── skeletons.md       # copy-paste TUI skeletons
+│   └── hard-won-lessons.md # bash TUI pitfalls
 ├── examples/
-│   ├── list-select.sh      # single-select list demo
-│   ├── action-list.sh      # action-list widget demo
-│   ├── confirm.sh          # confirm modal demo
-│   └── alert.sh            # alert modal demo
+│   ├── list-select.sh     # single-select list demo
+│   ├── action-list.sh     # action-list widget demo
+│   ├── confirm.sh         # confirm modal demo
+│   └── alert.sh           # alert modal demo
 └── tests/
-    ├── assert.sh            # test assertion helpers
-    ├── pty_run.py           # PTY-based integration test runner
-    ├── run.sh               # test runner (discovers test-*.sh)
-    ├── docker/              # cross-version portability matrix
-    │   ├── run-matrix.sh    # runs suite against all bash versions
-    │   ├── Dockerfile.bash3 # bash 3.2 (simulates macOS)
-    │   ├── Dockerfile.bash4 # bash 4.4
-    │   └── Dockerfile.bash5 # bash 5.x
+    ├── run.sh             # test runner
+    ├── assert.sh          # assertion helpers
+    ├── pty_run.py         # PTY-based integration runner
+    ├── docker/            # cross-version portability matrix (bash 3.2, 4.4, 5.x)
     ├── unit/
-    │   └── test-draw.sh     # unit tests for shellframe_pad_left
     └── integration/
-        ├── test-list-select.sh   # PTY tests for list-select example
-        ├── test-action-list.sh   # PTY tests for action-list widget
-        ├── test-confirm.sh       # PTY tests for confirm modal
-        └── test-alert.sh         # PTY tests for alert modal
 ```
 
+---
+
+## Portability
+
+The key known portability difference is bash 3.2 (macOS default): no decimal
+`-t` timeouts, no `{varname}` fd allocation, and subtly different `read`
+behavior. See [Hard-won lessons](docs/hard-won-lessons.md) for details.
+
+To test against multiple bash versions locally:
+
+```bash
+bash tests/docker/run-matrix.sh             # bash 3.2, 4.4, 5.x
+bash tests/docker/run-matrix.sh --no-cache  # force clean rebuild
+```
