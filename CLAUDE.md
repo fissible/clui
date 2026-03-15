@@ -2,6 +2,11 @@
 
 ## Design philosophy
 
+clui operates at two levels: a **widget library** for individual TUI interactions,
+and an **application runtime** (`clui_app`) for multi-screen declarative apps.
+New work should consider both levels — widgets are the building blocks; `clui_app`
+is the engine that drives them.
+
 ### 1. LEGO composability
 
 clui components are small, single-purpose, and composable — like LEGO bricks.
@@ -13,10 +18,6 @@ Widgets are built from primitives, not monoliths.
 - Widgets must not call other widgets (no implicit coupling between peers).
 - New components go in `src/widgets/` if they are interactive, `src/` if primitive.
 - Document every public function's inputs, outputs, and globals in the source file.
-
-Future direction: support a YAML-based widget composition format (`.clui.yaml`)
-that declares UI layouts as includes of named components, so callers can assemble
-UIs declaratively and source only what they need.
 
 ### 2. Full-featured UI library, not just primitives
 
@@ -39,11 +40,13 @@ clean data, not screen output.
 - Arrow keys, Enter, Space, Tab, `q` must work as expected everywhere.
 - No surprise terminal state left behind on exit or Ctrl-C.
 
-**Developer users** (PHP/bash tools that `source` or shell-out to clui):
+**Developer users** (bash tools that `source` clui):
 - Every widget returns a predictable exit code (0 = confirmed, 1 = cancelled).
 - Return values go to stdout; UI rendering goes to `/dev/tty`.
 - Globals follow the `CLUI_<WIDGET>_*` naming convention so they namespace cleanly.
 - The library must be sourceable with no side effects until a function is called.
+- `clui_app` event handlers are called directly (not in subshells) — they can
+  freely mutate application globals. See the subshell trap in Hard-won lessons.
 
 ### 4. Self-configuration and portability
 
@@ -91,6 +94,8 @@ version is a bug. The matrix must pass before merging changes to `src/`.
 
 - All public symbols are prefixed `clui_` (functions) or `CLUI_` (globals/constants).
 - Internal helpers are prefixed `_clui_` and must not be called by consumers.
+- `clui_app` context globals are prefixed `_CLUI_APP_` and are reset before each
+  screen render. Application state belongs in caller-defined globals, not here.
 - Use `local` for all function-scoped variables. Never pollute the caller's scope.
 - Use `printf` for all output; never bare `echo` (behavior varies across systems).
 - For bash 3.2 compatibility:
@@ -98,7 +103,39 @@ version is a bug. The matrix must pass before merging changes to `src/`.
   - Use integer `-t` values with `read`.
   - Use explicit fd numbers (3, 4…), not `{varname}` fd allocation.
   - Use `$(...)` not `<<<` when bash 3.2 `herestring` behavior matters.
+  - Guard array expansions: `"${arr[@]+"${arr[@]}"}"` to avoid unbound variable
+    errors on empty arrays under `set -u`.
 - Always restore terminal state (`stty`, cursor, alternate screen) in an EXIT trap.
+
+## Critical pitfalls
+
+### Event handlers must not run in subshells
+
+`clui_app` calls event handlers directly — never via `$()`. If an event handler
+runs in a subshell, any globals it sets (including `_CLUI_APP_NEXT`) are lost when
+the subshell exits. The app will loop forever or crash.
+
+**Correct:**
+```bash
+_app_ROOT_confirm() { _CLUI_APP_NEXT="CONFIRM"; }
+```
+
+**Wrong:**
+```bash
+_app_ROOT_confirm() { printf 'CONFIRM'; }   # ← only works if called in $()
+```
+
+`_clui_app_event` (the rc→event-name mapper) runs in `$()` and is intentionally
+pure. Event handlers (`confirm`, `quit`, `yes`, `no`, `dismiss`) are always
+called directly.
+
+### Empty array expansion under `set -u`
+
+bash 3.2 treats `${arr[@]}` as unbound when the array is empty and `set -u` is
+active. Always use the guard form when the array may be empty:
+```bash
+"${arr[@]+"${arr[@]}"}"
+```
 
 ## Gitignore
 
