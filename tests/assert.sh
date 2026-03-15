@@ -3,17 +3,17 @@
 #
 # Usage:
 #   source tests/assert.sh
-#   shellframe_test_begin "my test name"
+#   test_begin "my test name"
 #   assert_eq "expected" "actual"
 #   assert_output "expected output" my_command arg1 arg2
-#   shellframe_test_summary   # prints pass/fail counts; returns 1 if any failed
+#   test_summary   # prints pass/fail counts; returns 1 if any failed
 
 _SHELLFRAME_TEST_PASS=0
 _SHELLFRAME_TEST_FAIL=0
 _SHELLFRAME_TEST_NAME=""
 
 # Begin a named test section (optional; sets context for failure messages).
-shellframe_test_begin() {
+test_begin() {
     _SHELLFRAME_TEST_NAME="$1"
 }
 
@@ -56,7 +56,7 @@ assert_contains() {
 }
 
 # Print a summary line and return 1 if any tests failed.
-shellframe_test_summary() {
+test_summary() {
     local total=$(( _SHELLFRAME_TEST_PASS + _SHELLFRAME_TEST_FAIL ))
     if (( _SHELLFRAME_TEST_FAIL == 0 )); then
         printf 'OK  %d/%d tests passed\n' "$_SHELLFRAME_TEST_PASS" "$total"

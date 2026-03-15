@@ -15,16 +15,16 @@ _pty() {
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-shellframe_test_begin "alert: any key (Space) dismisses"
+test_begin "alert: any key (Space) dismisses"
 out=$(_pty SPACE)
 assert_contains "$out" "Alert dismissed"
 
-shellframe_test_begin "alert: Enter dismisses"
+test_begin "alert: Enter dismisses"
 out=$(_pty ENTER)
 assert_contains "$out" "Alert dismissed"
 
-shellframe_test_begin "alert: letter key dismisses"
+test_begin "alert: letter key dismisses"
 out=$(_pty q)
 assert_contains "$out" "Alert dismissed"
 
-shellframe_test_summary
+test_summary

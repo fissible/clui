@@ -7,7 +7,7 @@
 # Integration tests: tests/integration/test-*.sh (require Python 3 + PTY)
 #
 # Each test-*.sh should source tests/assert.sh, run assertions, then call
-# shellframe_test_summary at the end.  The run.sh script counts total pass/fail
+# test_summary at the end.  The run.sh script counts total pass/fail
 # across all files.
 
 set -u

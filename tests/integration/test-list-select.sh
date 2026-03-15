@@ -15,24 +15,24 @@ _pty() {
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-shellframe_test_begin "list-select: select first item (apple) with Enter"
+test_begin "list-select: select first item (apple) with Enter"
 out=$(_pty ENTER)
 assert_contains "$out" "You selected: apple"
 
-shellframe_test_begin "list-select: move down once, select banana"
+test_begin "list-select: move down once, select banana"
 out=$(_pty DOWN ENTER)
 assert_contains "$out" "You selected: banana"
 
-shellframe_test_begin "list-select: move down twice, select cherry"
+test_begin "list-select: move down twice, select cherry"
 out=$(_pty DOWN DOWN ENTER)
 assert_contains "$out" "You selected: cherry"
 
-shellframe_test_begin "list-select: quit with q — no selection"
+test_begin "list-select: quit with q — no selection"
 out=$(_pty q)
 assert_contains "$out" "No selection."
 
-shellframe_test_begin "list-select: select with Space key"
+test_begin "list-select: select with Space key"
 out=$(_pty SPACE)
 assert_contains "$out" "You selected: apple"
 
-shellframe_test_summary
+test_summary

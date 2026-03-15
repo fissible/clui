@@ -15,36 +15,36 @@ _pty() {
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-shellframe_test_begin "confirm: y key — confirmed"
+test_begin "confirm: y key — confirmed"
 out=$(_pty y)
 assert_contains "$out" "Confirmed"
 
-shellframe_test_begin "confirm: n key — cancelled"
+test_begin "confirm: n key — cancelled"
 out=$(_pty n)
 assert_contains "$out" "Cancelled"
 
-shellframe_test_begin "confirm: Enter selects default (Yes) — confirmed"
+test_begin "confirm: Enter selects default (Yes) — confirmed"
 out=$(_pty ENTER)
 assert_contains "$out" "Confirmed"
 
-shellframe_test_begin "confirm: Right then Enter — moves to No — cancelled"
+test_begin "confirm: Right then Enter — moves to No — cancelled"
 out=$(_pty RIGHT ENTER)
 assert_contains "$out" "Cancelled"
 
-shellframe_test_begin "confirm: Right then Left then Enter — back to Yes — confirmed"
+test_begin "confirm: Right then Left then Enter — back to Yes — confirmed"
 out=$(_pty RIGHT LEFT ENTER)
 assert_contains "$out" "Confirmed"
 
-shellframe_test_begin "confirm: q key — cancelled"
+test_begin "confirm: q key — cancelled"
 out=$(_pty q)
 assert_contains "$out" "Cancelled"
 
-shellframe_test_begin "confirm: Q key — cancelled"
+test_begin "confirm: Q key — cancelled"
 out=$(_pty Q)
 assert_contains "$out" "Cancelled"
 
-shellframe_test_begin "confirm: Esc key — cancelled"
+test_begin "confirm: Esc key — cancelled"
 out=$(_pty ESC)
 assert_contains "$out" "Cancelled"
 
-shellframe_test_summary
+test_summary
