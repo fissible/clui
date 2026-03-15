@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # clui/src/input.sh — Keyboard input reading
 #
-# COMPATIBILITY: bash 3.2+ (macOS default).
+# COMPATIBILITY: bash 3.2+ (macOS default). Note: {varname} fd allocation
+# (exec {fd}>&1) requires bash 4.1+; use fixed fd numbers (e.g. fd 3) instead.
 #
 # GOTCHA 1 — decimal timeouts: bash 3.2 does not accept fractional values for
 # `read -t`. Use integers only. `-t 0.1` produces "invalid timeout
@@ -14,7 +15,14 @@
 # (the `[`), leaving `A`/`B`/`C`/`D` in the buffer unread. Read escape
 # sequences one byte at a time instead.
 #
-# GOTCHA 3 — case pattern glob: in a bash `case` statement, `[A` is a glob
+# GOTCHA 3 — do not match \x03 (Ctrl+C) in the key handler: with stty -icanon
+# and isig still enabled (the default), Ctrl+C sends SIGINT to the process
+# rather than putting a \x03 byte in the input stream. Matching \x03 will
+# instead catch a buffered byte left over from a previous Ctrl+C that
+# interrupted a prior command, causing the TUI to immediately "abort" on
+# startup. Handle Ctrl+C exclusively via trap.
+#
+# GOTCHA 4 — case pattern glob: in a bash `case` statement, `[A` is a glob
 # bracket expression that matches the single character `A`, not the 2-char
 # string `[A`. Store sequences in variables and compare with `[[ == ]]`.
 

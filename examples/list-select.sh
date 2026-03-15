@@ -15,10 +15,9 @@ list_select() {
     # ── Route TUI output to the real terminal ─────────────────────────
     # When called as $(list_select ...), stdout is a pipe. Redirect to
     # /dev/tty so screen/draw output reaches the terminal. The final
-    # result printf at the end of the function restores stdout first so
-    # the selected value is captured by the $() caller.
-    local _orig_stdout
-    exec {_orig_stdout}>&1
+    # result printf restores stdout so the value is captured by $().
+    # Use fixed fd 3 — {varname} fd allocation requires bash 4.1+.
+    exec 3>&1
     exec 1>/dev/tty
 
     # ── Cleanup ───────────────────────────────────────────────────────
@@ -72,8 +71,8 @@ list_select() {
     trap - INT TERM
 
     # Restore original stdout so the result is captured by $() callers
-    exec 1>&$_orig_stdout
-    exec {_orig_stdout}>&-
+    exec 1>&3
+    exec 3>&-
 
     [[ -n "$result" ]] && printf '%s\n' "$result"
 }
