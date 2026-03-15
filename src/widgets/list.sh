@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# shellframe/src/widgets/list.sh — Selectable list widget (v2 composable)
+#
+# COMPATIBILITY: bash 3.2+ (macOS default).
+# REQUIRES: src/clip.sh, src/selection.sh, src/scroll.sh, src/draw.sh.
+#
+# ── Overview ──────────────────────────────────────────────────────────────────
+#
+# Renders a scrollable list of items with a highlighted cursor row.  Supports
+# single-select (cursor only) and multi-select (Space to toggle items).
+#
+# Call shellframe_list_init before first use or after changing SHELLFRAME_LIST_ITEMS.
+# Multiple list instances can coexist with different SHELLFRAME_LIST_CTX values.
+#
+# ── Input globals ─────────────────────────────────────────────────────────────
+#
+#   SHELLFRAME_LIST_ITEMS[@]   — display label per row
+#   SHELLFRAME_LIST_CTX        — selection/scroll context name (default: "list")
+#   SHELLFRAME_LIST_MULTISELECT — 0 (default) | 1 (Space toggles selection)
+#   SHELLFRAME_LIST_FOCUSED    — 0 (default) | 1
+#   SHELLFRAME_LIST_FOCUSABLE  — 1 (default) | 0
+#
+# ── Public API ────────────────────────────────────────────────────────────────
+#
+#   shellframe_list_init [ctx] [viewport_rows]
+#     Initialise selection and scroll state for the current SHELLFRAME_LIST_ITEMS.
+#     Must be called after any change to SHELLFRAME_LIST_ITEMS.
+#     viewport_rows defaults to 10; render updates it automatically via resize.
+#
+#   shellframe_list_render top left width height
+#     Draw visible items within the given region.  Output to /dev/tty.
+#
+#   shellframe_list_on_key key
+#     Returns:
+#       0  — key handled (app shell should redraw)
+#       1  — key not handled (pass to next handler)
+#       2  — Enter pressed (item confirmed; read cursor via shellframe_sel_cursor)
+#
+#   shellframe_list_on_focus focused  — set SHELLFRAME_LIST_FOCUSED
+#
+#   shellframe_list_size              — print "1 1 0 0"
+
+SHELLFRAME_LIST_CTX="list"
+SHELLFRAME_LIST_MULTISELECT=0
+SHELLFRAME_LIST_FOCUSED=0
+SHELLFRAME_LIST_FOCUSABLE=1
+SHELLFRAME_LIST_ITEMS=()
+
+# ── shellframe_list_init ─────────────────────────────────────────────────────
+
+shellframe_list_init() {
+    local _ctx="${1:-${SHELLFRAME_LIST_CTX:-list}}"
+    local _vrows="${2:-10}"
+    local _n=${#SHELLFRAME_LIST_ITEMS[@]}
+    shellframe_sel_init  "$_ctx" "$_n"
+    shellframe_scroll_init "$_ctx" "$_n" 1 "$_vrows" 1
+}
+
+# ── shellframe_list_render ────────────────────────────────────────────────────
+
+shellframe_list_render() {
+    local _top="$1" _left="$2" _width="$3" _height="$4"
+    local _ctx="${SHELLFRAME_LIST_CTX:-list}"
+    local _focused="${SHELLFRAME_LIST_FOCUSED:-0}"
+    local _multi="${SHELLFRAME_LIST_MULTISELECT:-0}"
+    local _n=${#SHELLFRAME_LIST_ITEMS[@]}
+
+    # Keep scroll viewport in sync with current render height
+    shellframe_scroll_resize "$_ctx" "$_height" 1
+
+    local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
+    local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
+
+    local _scroll_top
+    shellframe_scroll_top "$_ctx" _scroll_top
+
+    local _cursor
+    shellframe_sel_cursor "$_ctx" _cursor 2>/dev/null || _cursor=$(shellframe_sel_cursor "$_ctx")
+
+    local _r
+    for (( _r=0; _r<_height; _r++ )); do
+        local _row=$(( _top + _r ))
+        local _item_idx=$(( _scroll_top + _r ))
+
+        # Clear this row
+        printf '\033[%d;%dH\033[2K' "$_row" "$_left" >/dev/tty
+
+        [[ $_item_idx -ge $_n ]] && continue
+
+        local _label="${SHELLFRAME_LIST_ITEMS[$_item_idx]}"
+
+        # Checkbox prefix for multiselect
+        local _prefix=""
+        if (( _multi )); then
+            if shellframe_sel_is_selected "$_ctx" "$_item_idx"; then
+                _prefix="[x] "
+            else
+                _prefix="[ ] "
+            fi
+        fi
+
+        local _text="${_prefix}${_label}"
+        local _clipped
+        _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_width")
+
+        printf '\033[%d;%dH' "$_row" "$_left" >/dev/tty
+
+        if (( _item_idx == _cursor )); then
+            # Highlight cursor row
+            printf '%s' "$_rev" >/dev/tty
+            printf '%s' "$_clipped" >/dev/tty
+            # Pad to full width under highlight
+            local _clen=${#_clipped}
+            local _k=0
+            while (( _k < _width - _clen )); do
+                printf ' ' >/dev/tty
+                (( _k++ ))
+            done
+            printf '%s' "$_rst" >/dev/tty
+        else
+            printf '%s' "$_clipped" >/dev/tty
+        fi
+    done
+
+    # Leave cursor at last row, col left (component contract)
+    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >/dev/tty
+}
+
+# ── shellframe_list_on_key ────────────────────────────────────────────────────
+
+shellframe_list_on_key() {
+    local _key="$1"
+    local _ctx="${SHELLFRAME_LIST_CTX:-list}"
+
+    # Read viewport rows from scroll state (set by init/resize)
+    local _vr_var="_SHELLFRAME_SCROLL_${_ctx}_VROWS"
+    local _vrows="${!_vr_var:-10}"
+
+    local _k_up="${SHELLFRAME_KEY_UP:-$'\033[A'}"
+    local _k_down="${SHELLFRAME_KEY_DOWN:-$'\033[B'}"
+    local _k_pgup="${SHELLFRAME_KEY_PAGE_UP:-$'\033[5~'}"
+    local _k_pgdn="${SHELLFRAME_KEY_PAGE_DOWN:-$'\033[6~'}"
+    local _k_home="${SHELLFRAME_KEY_HOME:-$'\033[H'}"
+    local _k_end="${SHELLFRAME_KEY_END:-$'\033[F'}"
+
+    if [[ "$_key" == $'\r' ]] || [[ "$_key" == $'\n' ]]; then
+        return 2    # Enter: item confirmed
+    elif [[ "$_key" == "$_k_down" ]]; then
+        shellframe_sel_move "$_ctx" down
+        shellframe_scroll_ensure_row "$_ctx" "$(shellframe_sel_cursor "$_ctx")"
+        return 0
+    elif [[ "$_key" == "$_k_up" ]]; then
+        shellframe_sel_move "$_ctx" up
+        shellframe_scroll_ensure_row "$_ctx" "$(shellframe_sel_cursor "$_ctx")"
+        return 0
+    elif [[ "$_key" == "$_k_pgdn" ]]; then
+        shellframe_sel_move "$_ctx" page_down "$_vrows"
+        shellframe_scroll_move "$_ctx" page_down
+        shellframe_scroll_ensure_row "$_ctx" "$(shellframe_sel_cursor "$_ctx")"
+        return 0
+    elif [[ "$_key" == "$_k_pgup" ]]; then
+        shellframe_sel_move "$_ctx" page_up "$_vrows"
+        shellframe_scroll_move "$_ctx" page_up
+        shellframe_scroll_ensure_row "$_ctx" "$(shellframe_sel_cursor "$_ctx")"
+        return 0
+    elif [[ "$_key" == "$_k_home" ]]; then
+        shellframe_sel_move "$_ctx" home
+        shellframe_scroll_move "$_ctx" home
+        return 0
+    elif [[ "$_key" == "$_k_end" ]]; then
+        shellframe_sel_move "$_ctx" end
+        shellframe_scroll_move "$_ctx" end
+        return 0
+    elif [[ "$_key" == " " ]] && (( ${SHELLFRAME_LIST_MULTISELECT:-0} )); then
+        shellframe_sel_toggle "$_ctx"
+        return 0
+    fi
+
+    return 1
+}
+
+# ── shellframe_list_on_focus ──────────────────────────────────────────────────
+
+shellframe_list_on_focus() {
+    SHELLFRAME_LIST_FOCUSED="${1:-0}"
+}
+
+# ── shellframe_list_size ──────────────────────────────────────────────────────
+
+# min: 1×1; preferred: fill all available space (0×0)
+shellframe_list_size() {
+    printf '%d %d %d %d' 1 1 0 0
+}
