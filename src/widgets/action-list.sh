@@ -67,8 +67,8 @@ clui_action_list() {
         clui_raw_exit "$CLUI_AL_SAVED_STTY"
         clui_cursor_show
         clui_screen_exit
-        exec 1>&3  2>/dev/null || true
-        exec 3>&-  2>/dev/null || true
+        { exec 1>&3; } 2>/dev/null || true
+        { exec 3>&-; } 2>/dev/null || true
     }
     trap '_al_exit; exit 1' INT TERM
 
