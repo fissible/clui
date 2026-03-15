@@ -143,8 +143,9 @@ Before adding any new widget or screen:
 > Update this section at the end of each session.
 
 _Last updated: 2026-03-15_
-- shellql repo stubbed locally at `~/lib/fissible/shellql` (not yet pushed to GitHub)
-- shellframe GitHub issues not yet created — run the issue creation commands in shellframe/
+- shellql repo stubbed and pushed to GitHub (https://github.com/fissible/shellql)
+- All 28 GitHub issues created: shellframe #1–18, shellql #1–9
+- PROJECT.md is the master tracking sheet; shellql/PLAN.md cross-references shellframe issues
 - All work is in planning phase; no Phase 1–4 code written yet
 - Existing shellframe widgets (table, action-list, confirm, alert) are complete and tested
-- Next session: create GitHub issues for Phase 1–4 items (commands in shellframe TASKS.md)
+- **Next session: start shellframe #1 (component contract), #2 (layout contract), #3 (focus model) — all spec/doc work, no deps, can be done in one session**
