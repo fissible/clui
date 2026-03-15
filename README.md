@@ -74,10 +74,16 @@ working interactive list selector.
 | `src/selection.sh` | Cursor + multi-select state model for list widgets (`shellframe_sel_*`) |
 | `src/keymap.sh` | Canonical key name lookup (`shellframe_keyname`), named action keymaps (`shellframe_keymap_bind/lookup`), default nav/edit keymaps |
 | `src/cursor.sh` | Text cursor model for input fields — insert, delete, move, word-jump, kill ops (`shellframe_cur_*`) |
-| `src/widgets/action-list.sh` | Full-screen interactive action list |
-| `src/widgets/table.sh` | Full-page navigable table with headers, page chrome, scroll, and optional below-area |
-| `src/widgets/confirm.sh` | Modal yes/no dialog |
-| `src/widgets/alert.sh` | Modal informational dismiss dialog |
+| `src/text.sh` | v2 text primitive — `shellframe_text_render`, align (left/center/right), word-wrap, `shellframe_text_size` |
+| `src/scroll.sh` | V+H scroll state — `shellframe_scroll_move/resize/ensure_row/ensure_col`, multi-context |
+| `src/panel.sh` | v2 bordered box — single/double/rounded/none styles, title alignment, focus highlight |
+| `src/widgets/tab-bar.sh` | v2 horizontal tab bar — reverse-video active tab, left/right arrow nav |
+| `src/widgets/input-field.sh` | v2 single-line text input — cursor.sh backed, all edit keys, placeholder, mask mode |
+| `src/widgets/list.sh` | v2 scrollable selectable list — selection.sh + scroll.sh, optional multiselect |
+| `src/widgets/action-list.sh` | v1 full-screen interactive action list |
+| `src/widgets/table.sh` | v1 full-page navigable table with headers, page chrome, scroll, and optional below-area |
+| `src/widgets/confirm.sh` | v1 modal yes/no dialog |
+| `src/widgets/alert.sh` | v1 modal informational dismiss dialog |
 | `src/app.sh` | `shellframe_app` — declarative multi-screen FSM runtime |
 
 → **[Full API reference](docs/api.md)**
@@ -106,12 +112,18 @@ shellframe/
 │   ├── selection.sh       # cursor + multi-select state model (shellframe_sel_*)
 │   ├── keymap.sh          # key name lookup + named action keymaps
 │   ├── cursor.sh          # text cursor model for input fields (shellframe_cur_*)
+│   ├── text.sh            # v2 text primitive — render, align, wrap (shellframe_text_*)
+│   ├── scroll.sh          # v2 scroll state model — V+H, ensure_row/col (shellframe_scroll_*)
+│   ├── panel.sh           # v2 bordered box — styles, title, focus (shellframe_panel_*)
 │   ├── app.sh             # shellframe_app — declarative screen FSM runtime
 │   └── widgets/
-│       ├── action-list.sh # interactive action-list widget
-│       ├── table.sh       # full-page navigable table widget
-│       ├── confirm.sh     # modal yes/no confirmation dialog
-│       └── alert.sh       # modal informational dialog (dismiss-only)
+│       ├── tab-bar.sh     # v2 horizontal tab bar widget
+│       ├── input-field.sh # v2 single-line text input widget
+│       ├── list.sh        # v2 scrollable selectable list widget
+│       ├── action-list.sh # v1 interactive action-list widget
+│       ├── table.sh       # v1 full-page navigable table widget
+│       ├── confirm.sh     # v1 modal yes/no confirmation dialog
+│       └── alert.sh       # v1 modal informational dialog (dismiss-only)
 ├── docs/
 │   ├── api.md             # full API reference
 │   ├── skeletons.md       # copy-paste TUI skeletons

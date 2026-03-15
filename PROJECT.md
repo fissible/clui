@@ -50,12 +50,12 @@ Start every new session by reading this file. Update task status here when work 
 
 | # | Task                             | Effort | GH Issue | Status | Deps |
 |---|----------------------------------|--------|----------|--------|------|
-| 8  | Text primitive (render, clip, align, style) | M | [#8](https://github.com/fissible/shellframe/issues/8) | open | 7 |
-| 9  | Box/Panel (border, title, padding, focus state) | M | [#9](https://github.com/fissible/shellframe/issues/9) | open | 7,8 |
-| 10 | Scroll container (V+H scroll, clipping, pg/home/end) | L | [#10](https://github.com/fissible/shellframe/issues/10) | open | 7 |
-| 11 | Selectable list (items, selection, keyboard, scroll) | M | [#11](https://github.com/fissible/shellframe/issues/11) | open | 5,10 |
-| 12 | Input field (single-line, cursor, insert/delete, placeholder) | M | [#12](https://github.com/fissible/shellframe/issues/12) | open | 6 |
-| 13 | Tab bar (labels, active, overflow, keyboard) | S | [#13](https://github.com/fissible/shellframe/issues/13) | open | 3,5 |
+| 8  | Text primitive (render, clip, align, style) | M | [#8](https://github.com/fissible/shellframe/issues/8) | closed | 7 |
+| 9  | Box/Panel (border, title, padding, focus state) | M | [#9](https://github.com/fissible/shellframe/issues/9) | closed | 7,8 |
+| 10 | Scroll container (V+H scroll, clipping, pg/home/end) | L | [#10](https://github.com/fissible/shellframe/issues/10) | closed | 7 |
+| 11 | Selectable list (items, selection, keyboard, scroll) | M | [#11](https://github.com/fissible/shellframe/issues/11) | closed | 5,10 |
+| 12 | Input field (single-line, cursor, insert/delete, placeholder) | M | [#12](https://github.com/fissible/shellframe/issues/12) | closed | 6 |
+| 13 | Tab bar (labels, active, overflow, keyboard) | S | [#13](https://github.com/fissible/shellframe/issues/13) | closed | 3,5 |
 | 14 | Modal/dialog (overlay, focus trap, dismiss/confirm) | M | [#14](https://github.com/fissible/shellframe/issues/14) | open | 3,9 |
 | 15 | Tree view (expand/collapse, selection, keyboard, indent) | L | [#15](https://github.com/fissible/shellframe/issues/15) | open | 5,10,11 |
 | 16 | Text editor (multiline, cursor, scroll, submit hook) | L | [#16](https://github.com/fissible/shellframe/issues/16) | open | 6,10,12 |
@@ -148,8 +148,17 @@ _Last updated: 2026-03-15_
 - PROJECT.md is the master tracking sheet; shellql/PLAN.md cross-references shellframe issues
 - Existing shellframe widgets (table, action-list, confirm, alert) are complete and tested
 - Phase 1 complete: #1 component contract, #2 layout contract, #3 focus model written to `docs/contracts/`
-- Phase 2 complete: #5 selection model, #7 clipping helpers, #4 keyboard input mapping, #6 cursor model (185/185 assertions)
-  - `src/input.sh` extended: added 14 key constants (Tab, Shift-Tab, Backspace, Ctrl-A/E/K/U/W, Home, End, PgUp, PgDn, Delete) and 4-byte ESC sequence support in `shellframe_read_key`
+- Phase 2 complete: #5 selection model, #7 clipping helpers, #4 keyboard input mapping, #6 cursor model (259/259 assertions)
+  - `src/input.sh` extended: 14 key constants and 4-byte ESC sequence support in `shellframe_read_key`
   - `src/keymap.sh`: `shellframe_keyname`, `shellframe_keymap_bind/lookup`, `shellframe_keymap_default_nav/edit`
   - `src/cursor.sh`: full text cursor model — init, move, insert, backspace, delete, kill ops
-- **Next session: Phase 3 primitives. All Phase 2 deps are satisfied. Start with #8 (Text primitive) and #9 (Box/Panel) — both depend only on #7 (clip.sh, done). #8 is smallest effort.**
+- Phase 3 complete: #8 text, #9 panel, #10 scroll, #11 list, #12 input-field, #13 tab-bar (352/352 assertions)
+  - All are v2 composable components (render/on_key/on_focus/size contract)
+  - `src/text.sh`: `_shellframe_text_align`, `_shellframe_text_wrap_words`, `shellframe_text_render`, `shellframe_text_size`
+  - `src/scroll.sh`: context-keyed V+H scroll state, `shellframe_scroll_move/ensure_row/ensure_col/resize`
+  - `src/panel.sh`: single/double/rounded/none borders, title alignment, focus highlight
+  - `src/widgets/tab-bar.sh`: horizontal tabs with reverse-video active highlight, left/right nav
+  - `src/widgets/input-field.sh`: single-line edit using cursor.sh, all standard edit keys, mask mode
+  - `src/widgets/list.sh`: scrollable list using selection.sh + scroll.sh, optional multiselect
+  - Key decisions: `shellframe_sel_move ctx down` always moves 1 step (page_size only applies to page_up/page_down); field scroll is computed at render time from cursor position
+- **Next session: Phase 3 remaining — #14 Modal/dialog (deps: #3 focus, #9 panel). Phase 4 app shell (#18) follows. All deps for both are now satisfied.**
