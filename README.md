@@ -189,6 +189,52 @@ See [`examples/alert.sh`](examples/alert.sh) for a complete demo.
 
 ---
 
+### `src/app.sh`
+
+**`clui_app <prefix> [initial_screen]`**
+
+Application runtime. Drives a finite-state machine of screens, handling
+the render → widget → event → transition loop automatically. `initial_screen`
+defaults to `ROOT`.
+
+Define your application by implementing these functions for each screen `FOO`:
+
+| Function | Purpose |
+|---|---|
+| `PREFIX_FOO_type()` | Print widget type: `action-list` \| `confirm` \| `alert` |
+| `PREFIX_FOO_render()` | Populate widget context globals before the widget runs |
+| `PREFIX_FOO_EVENT()` | Print next screen name, or `__QUIT__` to exit |
+
+Events per widget type: `action-list` → `confirm` / `quit`; `confirm` → `yes` / `no`; `alert` → `dismiss`.
+
+Widget context globals (set in render hooks):
+
+| Global | Widget | Purpose |
+|---|---|---|
+| `_CLUI_APP_DRAW_FN` | `action-list` | Row renderer callback name |
+| `_CLUI_APP_KEY_FN` | `action-list` | Extra key handler callback name |
+| `_CLUI_APP_HINT` | `action-list` | Footer hint text |
+| `_CLUI_APP_QUESTION` | `confirm` | Question text |
+| `_CLUI_APP_TITLE` | `alert` | Title text |
+| `_CLUI_APP_DETAILS` | `confirm` + `alert` | Array of detail lines |
+
+```bash
+_myapp_ROOT_type()    { printf 'action-list'; }
+_myapp_ROOT_render()  { CLUI_AL_LABELS=(one two); CLUI_AL_ACTIONS=("go" "go");
+                        CLUI_AL_IDX=(0 0); _CLUI_APP_HINT="Enter confirm  q quit"; }
+_myapp_ROOT_confirm() { printf 'DONE'; }
+_myapp_ROOT_quit()    { printf '__QUIT__'; }
+
+_myapp_DONE_type()    { printf 'alert'; }
+_myapp_DONE_render()  { _CLUI_APP_TITLE="Done!"; }
+_myapp_DONE_dismiss() { printf 'ROOT'; }
+
+clui_app "_myapp" "ROOT"
+```
+
+
+---
+
 ## Recommended TUI skeleton
 
 ```bash
@@ -446,6 +492,7 @@ clui/
 │   ├── screen.sh    # alternate screen, cursor, stty
 │   ├── input.sh     # key reading + CLUI_KEY_* constants
 │   ├── draw.sh      # clui_pad_left, color constants
+│   ├── app.sh       # clui_app — declarative screen FSM runtime
 │   └── widgets/
 │       ├── action-list.sh  # interactive action-list widget
 │       ├── confirm.sh      # modal yes/no confirmation dialog
