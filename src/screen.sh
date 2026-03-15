@@ -15,8 +15,8 @@
 # scrollback). This is what less, vim, top, etc. all do. The caller's terminal
 # content is hidden but preserved — clui_screen_exit restores it exactly.
 clui_screen_enter() {
-    printf '\033[?1049h'  # enable alternate screen buffer
-    printf '\033[H\033[2J' # cursor home + clear
+    printf '\033[?1049h'     # enable alternate screen buffer
+    printf '\033[H\033[3J\033[2J'  # cursor home + clear screen + clear scrollback
 }
 
 clui_screen_exit() {
@@ -26,7 +26,11 @@ clui_screen_exit() {
 # Clear the current screen and move cursor to top-left. Call at the start of
 # each redraw cycle inside the alternate screen.
 clui_screen_clear() {
-    printf '\033[H\033[2J'
+    printf '\033[H\033[3J\033[2J'
+    # \033[H   — cursor home (top-left)
+    # \033[3J  — erase saved lines (clears scrollback so the scrollbar
+    #            doesn't shrink on each redraw)
+    # \033[2J  — erase entire visible screen
 }
 
 # ── Cursor ───────────────────────────────────────────────────────────────────
@@ -50,5 +54,8 @@ clui_cursor_show() { printf '\033[?25h'; }
 #   clui_raw_exit "$saved_stty"
 
 clui_raw_save()  { stty -g 2>/dev/null; }
-clui_raw_enter() { stty -echo -icanon min 1 time 0 2>/dev/null; }
+clui_raw_enter() { stty -echo -icanon -icrnl min 1 time 0 2>/dev/null; }
+# -icrnl: stop the tty from translating CR (\r) → NL (\n) on input.
+# Without this, Enter arrives as \n, but bash's `read` strips trailing
+# newlines and returns an empty string — so \n can never be matched.
 clui_raw_exit()  { stty "$1" 2>/dev/null || true; }
