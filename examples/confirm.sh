@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# examples/confirm.sh — Demo for clui_confirm modal widget
+# examples/confirm.sh — Demo for shellframe_confirm modal widget
 
 set -u
-CLUI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$CLUI_DIR/clui.sh"
+SHELLFRAME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$SHELLFRAME_DIR/shellframe.sh"
 
-clui_confirm "Delete 3 files permanently?" \
+shellframe_confirm "Delete 3 files permanently?" \
     "  config.json        delete" \
     "  cache/data.db      delete" \
     "  tmp/session.lock   delete"

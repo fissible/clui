@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# clui/src/input.sh — Keyboard input reading
+# shellframe/src/input.sh — Keyboard input reading
 #
 # COMPATIBILITY: bash 3.2+ (macOS default). Note: {varname} fd allocation
 # (exec {fd}>&1) requires bash 4.1+; use fixed fd numbers (e.g. fd 3) instead.
@@ -29,31 +29,31 @@
 # GOTCHA 5 — bash `read` converts \r to \n internally: even with stty -icrnl
 # set (so the PTY line discipline does NOT translate CR→LF), bash's own `read`
 # builtin converts \r (0x0D) to \n (0x0A) before storing the value. This means
-# CLUI_KEY_ENTER must be $'\n', not $'\r'.
+# SHELLFRAME_KEY_ENTER must be $'\n', not $'\r'.
 #   Additionally, `read -r -n1` (default \n delimiter) returns an empty string
 #   when \n is received (because \n is the delimiter and is stripped). To
 #   capture \n as a value, use `-d ''` (NUL delimiter) so that \n is treated
 #   as a regular character instead of a line terminator.
 
-# Pre-built key sequence constants for use with clui_read_key.
-CLUI_KEY_UP=$'\x1b[A'
-CLUI_KEY_DOWN=$'\x1b[B'
-CLUI_KEY_RIGHT=$'\x1b[C'
-CLUI_KEY_LEFT=$'\x1b[D'
-CLUI_KEY_ENTER=$'\n'   # bash read converts \r→\n internally; use \n here
-CLUI_KEY_SPACE=' '
-CLUI_KEY_ESC=$'\x1b'
+# Pre-built key sequence constants for use with shellframe_read_key.
+SHELLFRAME_KEY_UP=$'\x1b[A'
+SHELLFRAME_KEY_DOWN=$'\x1b[B'
+SHELLFRAME_KEY_RIGHT=$'\x1b[C'
+SHELLFRAME_KEY_LEFT=$'\x1b[D'
+SHELLFRAME_KEY_ENTER=$'\n'   # bash read converts \r→\n internally; use \n here
+SHELLFRAME_KEY_SPACE=' '
+SHELLFRAME_KEY_ESC=$'\x1b'
 
 # Read one keypress (including full escape sequences) into a variable.
 #
 # Usage:
 #   local key
-#   clui_read_key key
-#   if   [[ "$key" == "$CLUI_KEY_UP"    ]]; then ...
-#   elif [[ "$key" == "$CLUI_KEY_DOWN"  ]]; then ...
-#   elif [[ "$key" == "$CLUI_KEY_ENTER" ]]; then ...
+#   shellframe_read_key key
+#   if   [[ "$key" == "$SHELLFRAME_KEY_UP"    ]]; then ...
+#   elif [[ "$key" == "$SHELLFRAME_KEY_DOWN"  ]]; then ...
+#   elif [[ "$key" == "$SHELLFRAME_KEY_ENTER" ]]; then ...
 #
-# Prerequisites: call inside a clui_raw_enter session so the terminal is in
+# Prerequisites: call inside a shellframe_raw_enter session so the terminal is in
 # raw mode. Without raw mode, escape sequence bytes may echo between reads.
 #
 # Uses `read -d ''` (NUL delimiter) so that \n (produced by bash's internal
@@ -63,8 +63,8 @@ CLUI_KEY_ESC=$'\x1b'
 # The -t 1 timeout on the follow-on reads handles a standalone ESC press
 # gracefully (waits 1 s then returns just $'\x1b'). For arrow keys the
 # follow-on bytes are already in the buffer and return immediately.
-clui_read_key() {
-    local _out_var="${1:-_CLUI_KEY}"
+shellframe_read_key() {
+    local _out_var="${1:-_SHELLFRAME_KEY}"
     local _k _c1 _c2
     IFS= read -r -n1 -d '' _k
     if [[ "$_k" == $'\x1b' ]]; then

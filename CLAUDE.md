@@ -1,15 +1,15 @@
-# clui — Development Guidelines
+# shellframe — Development Guidelines
 
 ## Design philosophy
 
-clui operates at two levels: a **widget library** for individual TUI interactions,
-and an **application runtime** (`clui_app`) for multi-screen declarative apps.
-New work should consider both levels — widgets are the building blocks; `clui_app`
+shellframe operates at two levels: a **widget library** for individual TUI interactions,
+and an **application runtime** (`shellframe_app`) for multi-screen declarative apps.
+New work should consider both levels — widgets are the building blocks; `shellframe_app`
 is the engine that drives them.
 
 ### 1. LEGO composability
 
-clui components are small, single-purpose, and composable — like LEGO bricks.
+shellframe components are small, single-purpose, and composable — like LEGO bricks.
 Each source file in `src/` provides one concern (screen, input, draw, widgets).
 Widgets are built from primitives, not monoliths.
 
@@ -21,7 +21,7 @@ Widgets are built from primitives, not monoliths.
 
 ### 2. Full-featured UI library, not just primitives
 
-clui should cover the full lifecycle of gathering and using input from humans:
+shellframe should cover the full lifecycle of gathering and using input from humans:
 
 - **Input gathering**: prompts, free-text fields, password fields, confirmations
 - **Selection**: single-select lists, multi-select lists, action-lists
@@ -35,26 +35,26 @@ clean data, not screen output.
 
 ### 3. Two audiences, one library
 
-**Human users** (people running tools built with clui):
+**Human users** (people running tools built with shellframe):
 - Keyboard behavior must be predictable and documented in every widget's footer.
 - Arrow keys, Enter, Space, Tab, `q` must work as expected everywhere.
 - No surprise terminal state left behind on exit or Ctrl-C.
 
-**Developer users** (bash tools that `source` clui):
+**Developer users** (bash tools that `source` shellframe):
 - Every widget returns a predictable exit code (0 = confirmed, 1 = cancelled).
 - Return values go to stdout; UI rendering goes to `/dev/tty`.
-- Globals follow the `CLUI_<WIDGET>_*` naming convention so they namespace cleanly.
+- Globals follow the `SHELLFRAME_<WIDGET>_*` naming convention so they namespace cleanly.
 - The library must be sourceable with no side effects until a function is called.
-- `clui_app` event handlers are called directly (not in subshells) — they can
+- `shellframe_app` event handlers are called directly (not in subshells) — they can
   freely mutate application globals. See the subshell trap in Hard-won lessons.
 
 ### 4. Self-configuration and portability
 
-clui auto-detects the runtime environment on first load and writes a local
+shellframe auto-detects the runtime environment on first load and writes a local
 config file (`.toolrc.local` in the project root, gitignored) so settings are
 computed once and reused.
 
-**On load, clui detects and persists:**
+**On load, shellframe detects and persists:**
 - Bash version (affects `read -t` precision, fd allocation syntax, `printf` behavior)
 - Whether `{var}` fd allocation is available (bash 4.1+; macOS has 3.2)
 - Whether `read -t` accepts decimals (bash 4+; 3.2 requires integers)
@@ -62,18 +62,18 @@ computed once and reused.
 
 **Feature flags written to `.toolrc.local`:**
 ```bash
-CLUI_BASH_VERSION=3      # major version
-CLUI_FD_ALLOC=0          # 1 if {varname}>&1 syntax works
-CLUI_READ_DECIMAL_T=0    # 1 if read -t 0.1 works
-CLUI_TPUT_OK=1           # 1 if tput is functional
+SHELLFRAME_BASH_VERSION=3      # major version
+SHELLFRAME_FD_ALLOC=0          # 1 if {varname}>&1 syntax works
+SHELLFRAME_READ_DECIMAL_T=0    # 1 if read -t 0.1 works
+SHELLFRAME_TPUT_OK=1           # 1 if tput is functional
 ```
 
-These flags are sourced by `clui.sh` at load time. Individual functions check
+These flags are sourced by `shellframe.sh` at load time. Individual functions check
 them to select the right code path rather than duplicating version detection.
 
 ### 5. Docker-based cross-version test suite
 
-To ensure portability across bash versions, clui includes a Docker-based driver
+To ensure portability across bash versions, shellframe includes a Docker-based driver
 suite that runs the test suite against multiple bash versions:
 
 ```
@@ -92,9 +92,9 @@ version is a bug. The matrix must pass before merging changes to `src/`.
 
 ## Coding conventions
 
-- All public symbols are prefixed `clui_` (functions) or `CLUI_` (globals/constants).
-- Internal helpers are prefixed `_clui_` and must not be called by consumers.
-- `clui_app` context globals are prefixed `_CLUI_APP_` and are reset before each
+- All public symbols are prefixed `shellframe_` (functions) or `SHELLFRAME_` (globals/constants).
+- Internal helpers are prefixed `_shellframe_` and must not be called by consumers.
+- `shellframe_app` context globals are prefixed `_SHELLFRAME_APP_` and are reset before each
   screen render. Application state belongs in caller-defined globals, not here.
 - Use `local` for all function-scoped variables. Never pollute the caller's scope.
 - Use `printf` for all output; never bare `echo` (behavior varies across systems).
@@ -111,13 +111,13 @@ version is a bug. The matrix must pass before merging changes to `src/`.
 
 ### Event handlers must not run in subshells
 
-`clui_app` calls event handlers directly — never via `$()`. If an event handler
-runs in a subshell, any globals it sets (including `_CLUI_APP_NEXT`) are lost when
+`shellframe_app` calls event handlers directly — never via `$()`. If an event handler
+runs in a subshell, any globals it sets (including `_SHELLFRAME_APP_NEXT`) are lost when
 the subshell exits. The app will loop forever or crash.
 
 **Correct:**
 ```bash
-_app_ROOT_confirm() { _CLUI_APP_NEXT="CONFIRM"; }
+_app_ROOT_confirm() { _SHELLFRAME_APP_NEXT="CONFIRM"; }
 ```
 
 **Wrong:**
@@ -125,7 +125,7 @@ _app_ROOT_confirm() { _CLUI_APP_NEXT="CONFIRM"; }
 _app_ROOT_confirm() { printf 'CONFIRM'; }   # ← only works if called in $()
 ```
 
-`_clui_app_event` (the rc→event-name mapper) runs in `$()` and is intentionally
+`_shellframe_app_event` (the rc→event-name mapper) runs in `$()` and is intentionally
 pure. Event handlers (`confirm`, `quit`, `yes`, `no`, `dismiss`) are always
 called directly.
 

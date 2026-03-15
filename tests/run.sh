@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# clui/tests/run.sh — Discover and run all test files
+# shellframe/tests/run.sh — Discover and run all test files
 #
 # Usage: bash tests/run.sh [--unit | --integration | --all]
 #
@@ -7,13 +7,13 @@
 # Integration tests: tests/integration/test-*.sh (require Python 3 + PTY)
 #
 # Each test-*.sh should source tests/assert.sh, run assertions, then call
-# clui_test_summary at the end.  The run.sh script counts total pass/fail
+# shellframe_test_summary at the end.  The run.sh script counts total pass/fail
 # across all files.
 
 set -u
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLUI_DIR="$(cd "$TESTS_DIR/.." && pwd)"
+SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 _mode="${1:---all}"
 _total_pass=0
@@ -74,7 +74,7 @@ _run_suite() {
     done
 }
 
-printf 'clui test runner\n'
+printf 'shellframe test runner\n'
 
 case "$_mode" in
     --unit)

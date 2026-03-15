@@ -2,7 +2,7 @@
 """pty_run.py — Run a bash TUI script in a PTY and capture its output.
 
 Uses pty.fork() so the child has a proper controlling terminal, meaning
-/dev/tty works inside TUI scripts (important for clui's exec 1>/dev/tty).
+/dev/tty works inside TUI scripts (important for shellframe's exec 1>/dev/tty).
 
 Usage:
     python3 tests/pty_run.py <script> [KEY ...]

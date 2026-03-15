@@ -6,25 +6,25 @@
 # The final selections are printed to stdout.
 
 set -u
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)/clui.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)/shellframe.sh"
 
 # ── Populate widget globals ───────────────────────────────────────────────────
-CLUI_AL_LABELS=(
+SHELLFRAME_AL_LABELS=(
     "apple"
     "banana"
     "cherry"
     "date"
     "elderberry"
 )
-CLUI_AL_ACTIONS=(
+SHELLFRAME_AL_ACTIONS=(
     "nothing eat"
     "nothing eat peel"
     "nothing eat"
     "nothing eat"
     "nothing eat"
 )
-CLUI_AL_IDX=(0 0 0 0 0)
-CLUI_AL_META=("" "" "" "" "")
+SHELLFRAME_AL_IDX=(0 0 0 0 0)
+SHELLFRAME_AL_META=("" "" "" "" "")
 
 # ── Custom row renderer ───────────────────────────────────────────────────────
 # Signature: draw_row_fn "$i" "$label" "$acts_str" "$aidx" "$meta"
@@ -32,7 +32,7 @@ _demo_draw_row() {
     local i="$1" label="$2" acts_str="$3" aidx="$4"
 
     local cursor="  "
-    (( i == CLUI_AL_SELECTED )) && cursor="${CLUI_BOLD}> ${CLUI_RESET}"
+    (( i == SHELLFRAME_AL_SELECTED )) && cursor="${SHELLFRAME_BOLD}> ${SHELLFRAME_RESET}"
 
     local -a acts
     IFS=' ' read -r -a acts <<< "$acts_str"
@@ -40,17 +40,17 @@ _demo_draw_row() {
 
     local action_str
     case "$action" in
-        nothing)  action_str="${CLUI_GRAY}[ ------- ]${CLUI_RESET}" ;;
-        eat)      action_str="${CLUI_GREEN}[   eat   ]${CLUI_RESET}" ;;
-        peel)     action_str="${CLUI_PURPLE}[  peel   ]${CLUI_RESET}" ;;
-        *)        action_str="${CLUI_GRAY}[ $action ]${CLUI_RESET}" ;;
+        nothing)  action_str="${SHELLFRAME_GRAY}[ ------- ]${SHELLFRAME_RESET}" ;;
+        eat)      action_str="${SHELLFRAME_GREEN}[   eat   ]${SHELLFRAME_RESET}" ;;
+        peel)     action_str="${SHELLFRAME_PURPLE}[  peel   ]${SHELLFRAME_RESET}" ;;
+        *)        action_str="${SHELLFRAME_GRAY}[ $action ]${SHELLFRAME_RESET}" ;;
     esac
 
     printf "%b%-14s  %b\n" "$cursor" "$label" "$action_str"
 }
 
 # ── Run widget ────────────────────────────────────────────────────────────────
-clui_action_list "_demo_draw_row" "" \
+shellframe_action_list "_demo_draw_row" "" \
     "↑/↓ move  Space/→ cycle action  Enter confirm  q quit"
 _result=$?
 
@@ -60,9 +60,9 @@ _print_results() {
     local -a acts
     if (( _result == 0 )); then
         printf 'Confirmed!\n'
-        for label in "${CLUI_AL_LABELS[@]}"; do
-            IFS=' ' read -r -a acts <<< "${CLUI_AL_ACTIONS[$i]}"
-            action="${acts[${CLUI_AL_IDX[$i]}]}"
+        for label in "${SHELLFRAME_AL_LABELS[@]}"; do
+            IFS=' ' read -r -a acts <<< "${SHELLFRAME_AL_ACTIONS[$i]}"
+            action="${acts[${SHELLFRAME_AL_IDX[$i]}]}"
             if [[ "$action" != "nothing" ]]; then
                 printf "  %s → %s\n" "$label" "$action"
             fi

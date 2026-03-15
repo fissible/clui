@@ -1,4 +1,4 @@
-# clui — Bash TUI Library
+# shellframe — Bash TUI Library
 
 A composable, full-featured terminal UI library for bash. Designed to be
 sourced by other tools — each widget gathers input from a human and returns
@@ -15,13 +15,13 @@ clean data to the caller.
 - **Full UI lifecycle** — covers input gathering, selection, feedback, and output
   formatting. Every widget maps to a clear data shape (string, index, flag set).
 - **Two abstraction levels** — use widgets directly for simple one-off
-  interactions (`clui_confirm`, `clui_alert`), or declare a multi-screen
-  application with `clui_app`: define screens as function triples and let the
+  interactions (`shellframe_confirm`, `shellframe_alert`), or declare a multi-screen
+  application with `shellframe_app`: define screens as function triples and let the
   runtime own the session loop, widget dispatch, and transitions.
 - **Two audiences** — human-friendly keyboard behavior with discoverable footer
   hints; developer-friendly exit codes, namespaced globals, and stdout/tty split
   so widgets work correctly inside `$()` command substitution.
-- **Self-configuring** — on first load, clui detects the bash version and
+- **Self-configuring** — on first load, shellframe detects the bash version and
   terminal capabilities, writes feature flags to `.toolrc.local`, and reads them
   back on subsequent runs so code paths are chosen once per machine.
 - **Cross-version tested** — a Docker-based test matrix runs the suite against
@@ -36,28 +36,28 @@ See [`CLAUDE.md`](CLAUDE.md) for the full development guidelines.
 **Single widget** — call a widget directly and read its exit code:
 
 ```bash
-source /path/to/clui/clui.sh
+source /path/to/shellframe/shellframe.sh
 
-clui_confirm "Deploy to production?" "  api-server  restart" "  cache       flush"
+shellframe_confirm "Deploy to production?" "  api-server  restart" "  cache       flush"
 (( $? == 0 )) && deploy || echo "Cancelled."
 ```
 
 **Multi-screen application** — declare screens as function triples, let
-`clui_app` drive the loop:
+`shellframe_app` drive the loop:
 
 ```bash
-source /path/to/clui/clui.sh
+source /path/to/shellframe/shellframe.sh
 
 _app_ROOT_type()    { printf 'confirm'; }
-_app_ROOT_render()  { _CLUI_APP_QUESTION="Continue?"; }
-_app_ROOT_yes()     { _CLUI_APP_NEXT="DONE"; }
-_app_ROOT_no()      { _CLUI_APP_NEXT="__QUIT__"; }
+_app_ROOT_render()  { _SHELLFRAME_APP_QUESTION="Continue?"; }
+_app_ROOT_yes()     { _SHELLFRAME_APP_NEXT="DONE"; }
+_app_ROOT_no()      { _SHELLFRAME_APP_NEXT="__QUIT__"; }
 
 _app_DONE_type()    { printf 'alert'; }
-_app_DONE_render()  { _CLUI_APP_TITLE="All done."; }
-_app_DONE_dismiss() { _CLUI_APP_NEXT="__QUIT__"; }
+_app_DONE_render()  { _SHELLFRAME_APP_TITLE="All done."; }
+_app_DONE_dismiss() { _SHELLFRAME_APP_NEXT="__QUIT__"; }
 
-clui_app "_app" "ROOT"
+shellframe_app "_app" "ROOT"
 ```
 
 See [`examples/list-select.sh`](examples/list-select.sh) for a complete
@@ -71,38 +71,38 @@ working interactive list selector.
 
 | Function | Description |
 |---|---|
-| `clui_screen_enter` | Switch to alternate screen buffer + clear |
-| `clui_screen_exit` | Restore original screen (undoes `clui_screen_enter`) |
-| `clui_screen_clear` | Clear screen + move cursor home (for redraws) |
-| `clui_cursor_hide` | Hide cursor (`\033[?25l`) |
-| `clui_cursor_show` | Show cursor (`\033[?25h`) |
-| `clui_raw_save` | Print current stty state (capture with `$(...)`) |
-| `clui_raw_enter` | Set raw terminal mode for the TUI session |
-| `clui_raw_exit "$saved"` | Restore terminal to saved stty state |
+| `shellframe_screen_enter` | Switch to alternate screen buffer + clear |
+| `shellframe_screen_exit` | Restore original screen (undoes `shellframe_screen_enter`) |
+| `shellframe_screen_clear` | Clear screen + move cursor home (for redraws) |
+| `shellframe_cursor_hide` | Hide cursor (`\033[?25l`) |
+| `shellframe_cursor_show` | Show cursor (`\033[?25h`) |
+| `shellframe_raw_save` | Print current stty state (capture with `$(...)`) |
+| `shellframe_raw_enter` | Set raw terminal mode for the TUI session |
+| `shellframe_raw_exit "$saved"` | Restore terminal to saved stty state |
 
 ### `src/input.sh`
 
 | Symbol | Value | Description |
 |---|---|---|
-| `CLUI_KEY_UP` | `\x1b[A` | Up arrow |
-| `CLUI_KEY_DOWN` | `\x1b[B` | Down arrow |
-| `CLUI_KEY_RIGHT` | `\x1b[C` | Right arrow |
-| `CLUI_KEY_LEFT` | `\x1b[D` | Left arrow |
-| `CLUI_KEY_ENTER` | `\n` | Enter / Return (bash converts `\r`→`\n` internally) |
-| `CLUI_KEY_SPACE` | ` ` | Space |
-| `CLUI_KEY_ESC` | `\x1b` | Standalone Escape |
+| `SHELLFRAME_KEY_UP` | `\x1b[A` | Up arrow |
+| `SHELLFRAME_KEY_DOWN` | `\x1b[B` | Down arrow |
+| `SHELLFRAME_KEY_RIGHT` | `\x1b[C` | Right arrow |
+| `SHELLFRAME_KEY_LEFT` | `\x1b[D` | Left arrow |
+| `SHELLFRAME_KEY_ENTER` | `\n` | Enter / Return (bash converts `\r`→`\n` internally) |
+| `SHELLFRAME_KEY_SPACE` | ` ` | Space |
+| `SHELLFRAME_KEY_ESC` | `\x1b` | Standalone Escape |
 
-**`clui_read_key <varname>`**
+**`shellframe_read_key <varname>`**
 
 Reads one keypress (including full escape sequences) into `$varname`.
-Call inside a `clui_raw_enter` session. Compare results against the
-`CLUI_KEY_*` constants using `[[ "$key" == "$CLUI_KEY_UP" ]]`.
+Call inside a `shellframe_raw_enter` session. Compare results against the
+`SHELLFRAME_KEY_*` constants using `[[ "$key" == "$SHELLFRAME_KEY_UP" ]]`.
 Uses `read -d ''` (NUL delimiter) so Enter (`\n`) is captured rather
 than consumed as the line terminator (see Lesson 7 in Hard-won Lessons).
 
 ### `src/draw.sh`
 
-**`clui_pad_left <raw> <rendered> <width>`**
+**`shellframe_pad_left <raw> <rendered> <width>`**
 
 Left-aligns `$rendered` in a column of `$width` *visible* characters.
 `$raw` must be the plain-text (no ANSI codes) equivalent of `$rendered`
@@ -110,16 +110,16 @@ so its `${#raw}` byte count equals its visible character count.
 
 ```bash
 local raw="~/bin/gflow"
-local rendered="${CLUI_GRAY}~/bin/${CLUI_RESET}${CLUI_BOLD}gflow${CLUI_RESET}"
-printf '%b' "$(clui_pad_left "$raw" "$rendered" 20)"
+local rendered="${SHELLFRAME_GRAY}~/bin/${SHELLFRAME_RESET}${SHELLFRAME_BOLD}gflow${SHELLFRAME_RESET}"
+printf '%b' "$(shellframe_pad_left "$raw" "$rendered" 20)"
 ```
 
-Color constants `CLUI_BOLD`, `CLUI_RESET`, `CLUI_GREEN`, `CLUI_RED`,
-`CLUI_PURPLE`, `CLUI_GRAY`, `CLUI_WHITE` are set via `tput` at source time.
+Color constants `SHELLFRAME_BOLD`, `SHELLFRAME_RESET`, `SHELLFRAME_GREEN`, `SHELLFRAME_RED`,
+`SHELLFRAME_PURPLE`, `SHELLFRAME_GRAY`, `SHELLFRAME_WHITE` are set via `tput` at source time.
 
 ### `src/widgets/action-list.sh`
 
-**`clui_action_list [draw_row_fn] [extra_key_fn] [footer_text]`**
+**`shellframe_action_list [draw_row_fn] [extra_key_fn] [footer_text]`**
 
 Full-screen interactive list where each row has a set of named actions the
 user cycles through. Returns 0 on confirm, 1 on quit.
@@ -128,32 +128,32 @@ user cycles through. Returns 0 on confirm, 1 on quit.
 
 | Global | Description |
 |---|---|
-| `CLUI_AL_LABELS[@]` | Display label per row |
-| `CLUI_AL_ACTIONS[@]` | Space-separated action list per row (e.g. `"nothing install"`) |
-| `CLUI_AL_IDX[@]` | Current action index per row (init to 0) |
-| `CLUI_AL_META[@]` | Optional per-row metadata string passed to callbacks |
+| `SHELLFRAME_AL_LABELS[@]` | Display label per row |
+| `SHELLFRAME_AL_ACTIONS[@]` | Space-separated action list per row (e.g. `"nothing install"`) |
+| `SHELLFRAME_AL_IDX[@]` | Current action index per row (init to 0) |
+| `SHELLFRAME_AL_META[@]` | Optional per-row metadata string passed to callbacks |
 
 **Widget sets globals (readable from callbacks):**
 
 | Global | Description |
 |---|---|
-| `CLUI_AL_SELECTED` | Index of the currently highlighted row |
-| `CLUI_AL_SAVED_STTY` | Saved stty state — use with `clui_raw_exit` in `extra_key_fn` |
+| `SHELLFRAME_AL_SELECTED` | Index of the currently highlighted row |
+| `SHELLFRAME_AL_SAVED_STTY` | Saved stty state — use with `shellframe_raw_exit` in `extra_key_fn` |
 
 **Built-in key bindings:** `↑`/`↓` move, `Space`/`→` cycle action, `Enter`/`c` confirm, `q` quit.
 
 **draw_row_fn** signature: `draw_row_fn "$i" "$label" "$acts_str" "$aidx" "$meta"`
-Must print one complete line (with `\n`). `CLUI_AL_SELECTED` is set globally.
+Must print one complete line (with `\n`). `SHELLFRAME_AL_SELECTED` is set globally.
 
 **extra_key_fn** signature: `extra_key_fn "$key"`
 Called for unhandled keys. Return 0=handled+redraw, 1=not handled, 2=quit.
-Use `CLUI_AL_SAVED_STTY` to suspend the TUI (e.g. to run a pager).
+Use `SHELLFRAME_AL_SAVED_STTY` to suspend the TUI (e.g. to run a pager).
 
 See [`examples/action-list.sh`](examples/action-list.sh) for a complete demo.
 
 ### `src/widgets/confirm.sh`
 
-**`clui_confirm <question> [detail ...]`**
+**`shellframe_confirm <question> [detail ...]`**
 
 Centered modal yes/no dialog. Optional plain-text `detail` lines are shown
 above the question (e.g. a summary of pending changes). Returns 0 for Yes,
@@ -168,7 +168,7 @@ above the question (e.g. a summary of pending changes). Returns 0 for Yes,
 | `Esc` / `q` / `Q` | Cancel (same as No) |
 
 ```bash
-clui_confirm "Apply 3 pending changes?" \
+shellframe_confirm "Apply 3 pending changes?" \
     "  config.json   delete" \
     "  main.sh       install"
 
@@ -184,7 +184,7 @@ See [`examples/confirm.sh`](examples/confirm.sh) for a complete demo.
 
 ### `src/widgets/alert.sh`
 
-**`clui_alert <title> [detail ...]`**
+**`shellframe_alert <title> [detail ...]`**
 
 Centered informational modal. Shows a bold `title` heading and optional
 plain-text `detail` lines. Any keypress dismisses it. Always returns 0.
@@ -194,7 +194,7 @@ plain-text `detail` lines. Any keypress dismisses it. Always returns 0.
 | Any key | Dismiss |
 
 ```bash
-clui_alert "Deploy complete" \
+shellframe_alert "Deploy complete" \
     "web-server    restarted" \
     "cache         flushed"
 
@@ -208,11 +208,11 @@ See [`examples/alert.sh`](examples/alert.sh) for a complete demo.
 
 ### `src/app.sh`
 
-**`clui_app <prefix> [initial_screen]`**
+**`shellframe_app <prefix> [initial_screen]`**
 
 Declarative application runtime. Models a TUI application as a
 finite-state machine: screens are states, keypresses produce events,
-event handlers return the next screen name. `clui_app` owns the session
+event handlers return the next screen name. `shellframe_app` owns the session
 loop — you declare the screens; it handles widget dispatch and transitions.
 `initial_screen` defaults to `ROOT`. Returns when any handler prints `__QUIT__`.
 
@@ -225,7 +225,7 @@ chosen prefix):
 |---|---|---|
 | `PREFIX_FOO_type()` | `printf` | One of: `action-list` \| `confirm` \| `alert` — called in a subshell, do not modify globals |
 | `PREFIX_FOO_render()` | *(assigns globals)* | Populate widget context globals; called directly, safe to mutate state |
-| `PREFIX_FOO_EVENT()` | `_CLUI_APP_NEXT=` | Set `_CLUI_APP_NEXT` to next screen name; called directly, safe to mutate state |
+| `PREFIX_FOO_EVENT()` | `_SHELLFRAME_APP_NEXT=` | Set `_SHELLFRAME_APP_NEXT` to next screen name; called directly, safe to mutate state |
 
 **Events** each widget type produces:
 
@@ -239,10 +239,10 @@ chosen prefix):
 
 | Global | Set by | Purpose |
 |---|---|---|
-| `_CLUI_APP_NEXT` | `EVENT()` handlers | Next screen name (or `__QUIT__`). Reset to `""` before each event call. |
+| `_SHELLFRAME_APP_NEXT` | `EVENT()` handlers | Next screen name (or `__QUIT__`). Reset to `""` before each event call. |
 
 Event handlers run in the **current shell** (not a subshell), so they can freely
-read and write application state globals alongside setting `_CLUI_APP_NEXT`.
+read and write application state globals alongside setting `_SHELLFRAME_APP_NEXT`.
 
 #### Widget context globals
 
@@ -251,17 +251,17 @@ Set these in your `render()` hook. They are reset to empty before every
 
 | Global | Widget | Purpose |
 |---|---|---|
-| `_CLUI_APP_DRAW_FN` | `action-list` | Row renderer callback name (empty → built-in default) |
-| `_CLUI_APP_KEY_FN` | `action-list` | Extra key handler callback name (empty → none) |
-| `_CLUI_APP_HINT` | `action-list` | Footer hint text (empty → built-in default) |
-| `_CLUI_APP_QUESTION` | `confirm` | Question text |
-| `_CLUI_APP_TITLE` | `alert` | Title text |
-| `_CLUI_APP_DETAILS` | `confirm` + `alert` | Array of detail lines |
+| `_SHELLFRAME_APP_DRAW_FN` | `action-list` | Row renderer callback name (empty → built-in default) |
+| `_SHELLFRAME_APP_KEY_FN` | `action-list` | Extra key handler callback name (empty → none) |
+| `_SHELLFRAME_APP_HINT` | `action-list` | Footer hint text (empty → built-in default) |
+| `_SHELLFRAME_APP_QUESTION` | `confirm` | Question text |
+| `_SHELLFRAME_APP_TITLE` | `alert` | Title text |
+| `_SHELLFRAME_APP_DETAILS` | `confirm` + `alert` | Array of detail lines |
 
 #### Application context
 
 Application-level state shared between screens (e.g. a pending-changes list,
-results from an apply step) is not managed by `clui_app`. Use your own
+results from an apply step) is not managed by `shellframe_app`. Use your own
 module-level globals, by convention prefixed with your app name:
 
 ```bash
@@ -277,27 +277,27 @@ _MYAPP_RESULTS=()
 
 _myapp_ROOT_type()    { printf 'action-list'; }
 _myapp_ROOT_render()  {
-    CLUI_AL_LABELS=("task-a" "task-b")
-    CLUI_AL_ACTIONS=("nothing run" "nothing run")
-    CLUI_AL_IDX=(0 0)
-    _CLUI_APP_HINT="Space cycle  Enter confirm  q quit"
+    SHELLFRAME_AL_LABELS=("task-a" "task-b")
+    SHELLFRAME_AL_ACTIONS=("nothing run" "nothing run")
+    SHELLFRAME_AL_IDX=(0 0)
+    _SHELLFRAME_APP_HINT="Space cycle  Enter confirm  q quit"
 }
 _myapp_ROOT_confirm() {
-    # check CLUI_AL_IDX for selections; if nothing selected, go back
-    _CLUI_APP_NEXT="CONFIRM"
+    # check SHELLFRAME_AL_IDX for selections; if nothing selected, go back
+    _SHELLFRAME_APP_NEXT="CONFIRM"
 }
-_myapp_ROOT_quit() { _CLUI_APP_NEXT="__QUIT__"; }
+_myapp_ROOT_quit() { _SHELLFRAME_APP_NEXT="__QUIT__"; }
 
 _myapp_CONFIRM_type()    { printf 'confirm'; }
-_myapp_CONFIRM_render()  { _CLUI_APP_QUESTION="Run selected tasks?"; }
-_myapp_CONFIRM_yes()     { _MYAPP_RESULTS=("task-a: ok" "task-b: ok"); _CLUI_APP_NEXT="RESULT"; }
-_myapp_CONFIRM_no()      { _CLUI_APP_NEXT="ROOT"; }
+_myapp_CONFIRM_render()  { _SHELLFRAME_APP_QUESTION="Run selected tasks?"; }
+_myapp_CONFIRM_yes()     { _MYAPP_RESULTS=("task-a: ok" "task-b: ok"); _SHELLFRAME_APP_NEXT="RESULT"; }
+_myapp_CONFIRM_no()      { _SHELLFRAME_APP_NEXT="ROOT"; }
 
 _myapp_RESULT_type()     { printf 'alert'; }
-_myapp_RESULT_render()   { _CLUI_APP_TITLE="Done"; _CLUI_APP_DETAILS=("${_MYAPP_RESULTS[@]}"); }
-_myapp_RESULT_dismiss()  { _CLUI_APP_NEXT="ROOT"; }
+_myapp_RESULT_render()   { _SHELLFRAME_APP_TITLE="Done"; _SHELLFRAME_APP_DETAILS=("${_MYAPP_RESULTS[@]}"); }
+_myapp_RESULT_dismiss()  { _SHELLFRAME_APP_NEXT="ROOT"; }
 
-clui_app "_myapp" "ROOT"
+shellframe_app "_myapp" "ROOT"
 ```
 
 For a full real-world example see [`macbin/scripts`](https://github.com/fissible/macbin)
@@ -309,13 +309,13 @@ symlinks in `~/bin`.
 
 ## Recommended TUI skeletons
 
-### Application skeleton (`clui_app`)
+### Application skeleton (`shellframe_app`)
 
 Use this for any multi-screen application. Define screens as function
-triples; `clui_app` manages the loop.
+triples; `shellframe_app` manages the loop.
 
 ```bash
-source /path/to/clui/clui.sh
+source /path/to/shellframe/shellframe.sh
 
 # Module-level context globals shared between screens
 _APP_DATA=()
@@ -323,29 +323,29 @@ _APP_DATA=()
 # ── Screen: MAIN (action-list) ──────────────────────────────────────
 _app_MAIN_type()    { printf 'action-list'; }
 _app_MAIN_render()  {
-    CLUI_AL_LABELS=(...)
-    CLUI_AL_ACTIONS=(...)
-    CLUI_AL_IDX=(...)
-    _CLUI_APP_DRAW_FN="_app_draw_row"   # optional custom renderer
-    _CLUI_APP_HINT="Space cycle  Enter confirm  q quit"
+    SHELLFRAME_AL_LABELS=(...)
+    SHELLFRAME_AL_ACTIONS=(...)
+    SHELLFRAME_AL_IDX=(...)
+    _SHELLFRAME_APP_DRAW_FN="_app_draw_row"   # optional custom renderer
+    _SHELLFRAME_APP_HINT="Space cycle  Enter confirm  q quit"
 }
-_app_MAIN_confirm() { _CLUI_APP_NEXT="CONFIRM"; }   # or 'MAIN' if nothing selected
-_app_MAIN_quit()    { _CLUI_APP_NEXT="__QUIT__"; }
+_app_MAIN_confirm() { _SHELLFRAME_APP_NEXT="CONFIRM"; }   # or 'MAIN' if nothing selected
+_app_MAIN_quit()    { _SHELLFRAME_APP_NEXT="__QUIT__"; }
 
 # ── Screen: CONFIRM (yes/no modal) ─────────────────────────────────
 _app_CONFIRM_type()   { printf 'confirm'; }
-_app_CONFIRM_render() { _CLUI_APP_QUESTION="Apply changes?"; }
-_app_CONFIRM_yes()    { _app_apply; _CLUI_APP_NEXT="RESULT"; }
-_app_CONFIRM_no()     { _CLUI_APP_NEXT="MAIN"; }
+_app_CONFIRM_render() { _SHELLFRAME_APP_QUESTION="Apply changes?"; }
+_app_CONFIRM_yes()    { _app_apply; _SHELLFRAME_APP_NEXT="RESULT"; }
+_app_CONFIRM_no()     { _SHELLFRAME_APP_NEXT="MAIN"; }
 
 # ── Screen: RESULT (alert modal) ───────────────────────────────────
 _app_RESULT_type()    { printf 'alert'; }
-_app_RESULT_render()  { _CLUI_APP_TITLE="Done"; _CLUI_APP_DETAILS=("${_APP_DATA[@]}"); }
-_app_RESULT_dismiss() { _CLUI_APP_NEXT="MAIN"; }
+_app_RESULT_render()  { _SHELLFRAME_APP_TITLE="Done"; _SHELLFRAME_APP_DETAILS=("${_APP_DATA[@]}"); }
+_app_RESULT_dismiss() { _SHELLFRAME_APP_NEXT="MAIN"; }
 
 # ── Entry point ────────────────────────────────────────────────────
 my_app() {
-    clui_app "_app" "MAIN"
+    shellframe_app "_app" "MAIN"
 }
 ```
 
@@ -355,30 +355,30 @@ Use this when building a new widget or a single-screen TUI that doesn't
 fit the three standard widget types.
 
 ```bash
-source /path/to/clui/clui.sh
+source /path/to/shellframe/shellframe.sh
 
 my_widget() {
     # ── Setup ──────────────────────────────────────────────────────
     local saved_stty
-    saved_stty=$(clui_raw_save)
+    saved_stty=$(shellframe_raw_save)
     exec 3>&1; exec 1>/dev/tty
 
     _exit() {
-        clui_raw_exit "$saved_stty"
-        clui_cursor_show
-        clui_screen_exit
+        shellframe_raw_exit "$saved_stty"
+        shellframe_cursor_show
+        shellframe_screen_exit
         { exec 1>&3; } 2>/dev/null || true
         { exec 3>&-; } 2>/dev/null || true
     }
     trap '_exit; exit 1' INT TERM
 
-    clui_screen_enter
-    clui_raw_enter
-    clui_cursor_hide
+    shellframe_screen_enter
+    shellframe_raw_enter
+    shellframe_cursor_hide
 
     # ── Draw ───────────────────────────────────────────────────────
     _draw() {
-        clui_screen_clear
+        shellframe_screen_clear
         # ... printf your UI here using ANSI escape sequences ...
     }
     _draw
@@ -386,10 +386,10 @@ my_widget() {
     # ── Input loop ─────────────────────────────────────────────────
     local key
     while true; do
-        clui_read_key key
-        if   [[ "$key" == "$CLUI_KEY_UP"    ]]; then : # handle up
-        elif [[ "$key" == "$CLUI_KEY_DOWN"  ]]; then : # handle down
-        elif [[ "$key" == "$CLUI_KEY_ENTER" ]]; then break
+        shellframe_read_key key
+        if   [[ "$key" == "$SHELLFRAME_KEY_UP"    ]]; then : # handle up
+        elif [[ "$key" == "$SHELLFRAME_KEY_DOWN"  ]]; then : # handle down
+        elif [[ "$key" == "$SHELLFRAME_KEY_ENTER" ]]; then break
         elif [[ "$key" == 'q' ]]; then break
         fi
         _draw
@@ -505,10 +505,10 @@ and use its `${#raw}` length to compute padding manually.
 
 ```bash
 # ✗ — padding is too short because ANSI bytes inflate the measurement
-printf "%-20b" "${CLUI_GREEN}hello${CLUI_RESET}"
+printf "%-20b" "${SHELLFRAME_GREEN}hello${SHELLFRAME_RESET}"
 
 # ✓ — measure raw, output rendered + explicit padding
-printf '%b' "$(clui_pad_left "hello" "${CLUI_GREEN}hello${CLUI_RESET}" 20)"
+printf '%b' "$(shellframe_pad_left "hello" "${SHELLFRAME_GREEN}hello${SHELLFRAME_RESET}" 20)"
 ```
 
 ### 7. bash `read` converts `\r` to `\n` internally — use `read -d ''` for Enter
@@ -521,7 +521,7 @@ storing the result. The consequence:
   → `key` is empty (the delimiter is consumed, not stored).
 - The fix is `read -d ''` (NUL delimiter), so `\n` is not the stop character
   and is captured as the key value.
-- Set `CLUI_KEY_ENTER=$'\n'`, not `$'\r'`.
+- Set `SHELLFRAME_KEY_ENTER=$'\n'`, not `$'\r'`.
 
 ```bash
 # ✗ — Enter becomes the delimiter; key is always empty on Enter
@@ -609,14 +609,14 @@ bash tests/docker/run-matrix.sh --no-cache  # force clean rebuild
 ## File layout
 
 ```
-clui/
-├── clui.sh          # entry point — source this
+shellframe/
+├── shellframe.sh          # entry point — source this
 ├── .dockerignore    # excludes .git and .toolrc.local from Docker builds
 ├── src/
 │   ├── screen.sh    # alternate screen, cursor, stty
-│   ├── input.sh     # key reading + CLUI_KEY_* constants
-│   ├── draw.sh      # clui_pad_left, color constants
-│   ├── app.sh       # clui_app — declarative screen FSM runtime
+│   ├── input.sh     # key reading + SHELLFRAME_KEY_* constants
+│   ├── draw.sh      # shellframe_pad_left, color constants
+│   ├── app.sh       # shellframe_app — declarative screen FSM runtime
 │   └── widgets/
 │       ├── action-list.sh  # interactive action-list widget
 │       ├── confirm.sh      # modal yes/no confirmation dialog
@@ -636,7 +636,7 @@ clui/
     │   ├── Dockerfile.bash4 # bash 4.4
     │   └── Dockerfile.bash5 # bash 5.x
     ├── unit/
-    │   └── test-draw.sh     # unit tests for clui_pad_left
+    │   └── test-draw.sh     # unit tests for shellframe_pad_left
     └── integration/
         ├── test-list-select.sh   # PTY tests for list-select example
         ├── test-action-list.sh   # PTY tests for action-list widget

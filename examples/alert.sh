@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# examples/alert.sh — Demo for clui_alert informational modal widget
+# examples/alert.sh — Demo for shellframe_alert informational modal widget
 
 set -u
-CLUI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
-source "$CLUI_DIR/clui.sh"
+SHELLFRAME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
+source "$SHELLFRAME_DIR/shellframe.sh"
 
-clui_alert "Deploy complete" \
+shellframe_alert "Deploy complete" \
     "web-server    restarted" \
     "cache         flushed" \
     "config.json   reloaded"

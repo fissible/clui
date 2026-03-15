@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# examples/list-select.sh — Interactive single-select list using clui
+# examples/list-select.sh — Interactive single-select list using shellframe
 #
 # Usage: ./list-select.sh
 # Returns the selected item on stdout after the TUI exits.
 
 set -u
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/clui.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/shellframe.sh"
 
 list_select() {
     local -a items=("$@")
@@ -22,43 +22,43 @@ list_select() {
 
     # ── Cleanup ───────────────────────────────────────────────────────
     local saved_stty
-    saved_stty=$(clui_raw_save)
+    saved_stty=$(shellframe_raw_save)
 
     _ls_exit() {
-        clui_raw_exit "$saved_stty"
-        clui_cursor_show
-        clui_screen_exit
+        shellframe_raw_exit "$saved_stty"
+        shellframe_cursor_show
+        shellframe_screen_exit
     }
     trap '_ls_exit; exit 1' INT TERM
 
     # ── Enter TUI ─────────────────────────────────────────────────────
-    clui_screen_enter
-    clui_raw_enter
-    clui_cursor_hide
+    shellframe_screen_enter
+    shellframe_raw_enter
+    shellframe_cursor_hide
 
     _draw() {
-        clui_screen_clear
+        shellframe_screen_clear
         local i
         for (( i=0; i<n; i++ )); do
             if (( i == selected )); then
-                printf "  ${CLUI_BOLD}${CLUI_GREEN}> %s${CLUI_RESET}\n" "${items[$i]}"
+                printf "  ${SHELLFRAME_BOLD}${SHELLFRAME_GREEN}> %s${SHELLFRAME_RESET}\n" "${items[$i]}"
             else
-                printf "    ${CLUI_GRAY}%s${CLUI_RESET}\n" "${items[$i]}"
+                printf "    ${SHELLFRAME_GRAY}%s${SHELLFRAME_RESET}\n" "${items[$i]}"
             fi
         done
-        printf "\n  ${CLUI_GRAY}↑/↓ move  Enter select  q quit${CLUI_RESET}\n"
+        printf "\n  ${SHELLFRAME_GRAY}↑/↓ move  Enter select  q quit${SHELLFRAME_RESET}\n"
     }
     _draw
 
     # ── Input loop ────────────────────────────────────────────────────
     local key result=""
     while true; do
-        clui_read_key key
-        if   [[ "$key" == "$CLUI_KEY_UP"    ]]; then
+        shellframe_read_key key
+        if   [[ "$key" == "$SHELLFRAME_KEY_UP"    ]]; then
             (( selected > 0     )) && (( selected-- )) || true
-        elif [[ "$key" == "$CLUI_KEY_DOWN"  ]]; then
+        elif [[ "$key" == "$SHELLFRAME_KEY_DOWN"  ]]; then
             (( selected < n - 1 )) && (( selected++ )) || true
-        elif [[ "$key" == "$CLUI_KEY_ENTER" || "$key" == "$CLUI_KEY_SPACE" ]]; then
+        elif [[ "$key" == "$SHELLFRAME_KEY_ENTER" || "$key" == "$SHELLFRAME_KEY_SPACE" ]]; then
             result="${items[$selected]}"
             break
         elif [[ "$key" == 'q' || "$key" == 'Q' || "$key" == $'\x03' ]]; then

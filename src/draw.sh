@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# clui/src/draw.sh — ANSI-aware rendering utilities
+# shellframe/src/draw.sh — ANSI-aware rendering utilities
 
 # ── Column padding ────────────────────────────────────────────────────────────
 #
@@ -16,8 +16,8 @@
 # Usage:
 #   local raw="~/bin/gflow"
 #   local rendered="${GRAY}~/bin/${RESET}${BOLD}gflow${RESET}"
-#   printf '%b' "$(clui_pad_left "$raw" "$rendered" 20)"
-clui_pad_left() {
+#   printf '%b' "$(shellframe_pad_left "$raw" "$rendered" 20)"
+shellframe_pad_left() {
     local raw="$1" rendered="$2" width="$3"
     local pad=$(( width - ${#raw} ))
     (( pad < 0 )) && pad=0
@@ -26,10 +26,10 @@ clui_pad_left() {
 
 # ── Color constants ───────────────────────────────────────────────────────────
 
-CLUI_BOLD=$(tput bold   2>/dev/null || true)
-CLUI_RESET=$(tput sgr0  2>/dev/null || true)
-CLUI_GREEN=$(tput setaf 2 2>/dev/null || true)
-CLUI_RED=$(tput setaf 1   2>/dev/null || true)
-CLUI_PURPLE=$(tput setaf 5 2>/dev/null || true)
-CLUI_GRAY=$(tput setaf 8 2>/dev/null || tput setaf 7 2>/dev/null || true)
-CLUI_WHITE=$(tput setaf 7 2>/dev/null || true)
+SHELLFRAME_BOLD=$(tput bold   2>/dev/null || true)
+SHELLFRAME_RESET=$(tput sgr0  2>/dev/null || true)
+SHELLFRAME_GREEN=$(tput setaf 2 2>/dev/null || true)
+SHELLFRAME_RED=$(tput setaf 1   2>/dev/null || true)
+SHELLFRAME_PURPLE=$(tput setaf 5 2>/dev/null || true)
+SHELLFRAME_GRAY=$(tput setaf 8 2>/dev/null || tput setaf 7 2>/dev/null || true)
+SHELLFRAME_WHITE=$(tput setaf 7 2>/dev/null || true)
