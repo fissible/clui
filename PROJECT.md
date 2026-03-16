@@ -165,7 +165,7 @@ Before adding any new widget or screen:
 ## Session handoff notes
 > Update this section at the end of each session.
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-16_
 - shellql repo stubbed and pushed to GitHub (https://github.com/fissible/shellql)
 - All 28 GitHub issues created: shellframe #1–18, shellql #1–9
 - PROJECT.md is the master tracking sheet; shellql/PLAN.md cross-references shellframe issues
@@ -184,7 +184,5 @@ _Last updated: 2026-03-15_
   - `src/widgets/input-field.sh`: single-line edit using cursor.sh, all standard edit keys, mask mode
   - `src/widgets/list.sh`: scrollable list using selection.sh + scroll.sh, optional multiselect
   - Key decisions: `shellframe_sel_move ctx down` always moves 1 step (page_size only applies to page_up/page_down); field scroll is computed at render time from cursor position
-- **ptyunit open-source repo created** (https://github.com/fissible/ptyunit): all phases complete, Docker matrix 3/3 green. Shellframe now uses ptyunit as a git submodule (`tests/ptyunit/`); `tests/assert.sh`, `tests/run.sh`, `tests/pty_run.py` removed. Run tests with `bash tests/ptyunit/run.sh`.
-- **Phase 7 planned**: platform enhancements (input hardening, dirty-region + framebuffer diff rendering, mouse support) added to PROJECT.md. Migration rationale and two-stage rendering roadmap documented in `src/screen.sh`. GitHub issues for Phase 7 tasks A–F not yet created (marked `#TBD`).
-- **ptyunit migration complete**: shellframe now sources `tests/ptyunit/` (git submodule); 352/352 assertions pass (330 unit + 22 integration). Run with `bash tests/ptyunit/run.sh`.
+- **ptyunit migration complete** (2026-03-16): shellframe now uses ptyunit as a git submodule (`tests/ptyunit/`); `tests/assert.sh`, `tests/run.sh`, `tests/pty_run.py` removed; all test files updated to `ptyunit_test_begin`/`ptyunit_test_summary`; Docker matrix updated. 352/352 assertions pass (330 unit + 22 integration). Run with `bash tests/ptyunit/run.sh`.
 - **Next session: Phase 3 remaining — #14 Modal/dialog (deps: #3 focus, #9 panel). Phase 4 app shell (#18) follows. All deps for both are now satisfied.**
