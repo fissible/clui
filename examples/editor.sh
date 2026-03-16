@@ -5,15 +5,14 @@
 #   With no arguments, starts with a blank buffer.
 #   With a file argument, loads the file content for editing.
 #   On Ctrl-D, exits and prints the final text to stdout.
-#   On Ctrl-C / q (from outside focused field), exits without output.
+#   On Ctrl-C, exits without output.
 #
 # Keys:
 #   ↑ ↓ ← →         — navigate
-#   Home / End       — start / end of line
-#   Ctrl-A / Ctrl-E  — start / end of line
+#   Home / End       — start / end of line  (also Ctrl-A / Ctrl-E)
 #   Enter            — insert newline
 #   Backspace        — delete before cursor; joins lines at col 0
-#   Delete           — delete at cursor; joins lines at EOL
+#   Delete           — delete at cursor;    joins lines at EOL
 #   Ctrl-K           — kill to end of line
 #   Ctrl-U           — kill to start of line
 #   Ctrl-W           — kill word left
@@ -34,19 +33,27 @@ if [[ "${1:-}" != "" && -f "$1" ]]; then
 fi
 
 # ── Terminal setup ─────────────────────────────────────────────────────────────
+#
+# All terminal escape sequences write to /dev/tty directly so they reach the
+# real terminal even if stdout is redirected.  The result is printed to stdout
+# after cleanup so callers can capture it with $().
 
 saved_stty=$(shellframe_raw_save)
 
-_editor_exit() {
+_cleanup() {
     shellframe_raw_exit "$saved_stty"
-    shellframe_cursor_show
-    shellframe_screen_exit
+    printf '\033[?25h'  >/dev/tty   # show cursor
+    printf '\033[?1049l' >/dev/tty  # exit alternate screen buffer
 }
-trap '_editor_exit; exit 1' INT TERM
+# EXIT fires on every exit path (normal, error, Ctrl-C).
+# INT/TERM just trigger exit so the EXIT trap handles cleanup.
+trap '_cleanup' EXIT
+trap 'exit 1'   INT TERM
 
-shellframe_screen_enter
+# Enter the TUI
+printf '\033[?1049h\033[H\033[3J\033[2J' >/dev/tty  # alt screen + clear
+printf '\033[?25l' >/dev/tty                         # hide cursor
 shellframe_raw_enter
-shellframe_cursor_hide
 
 # ── Init widget ────────────────────────────────────────────────────────────────
 
@@ -56,36 +63,27 @@ shellframe_editor_init "main"
 
 # ── Draw ───────────────────────────────────────────────────────────────────────
 
-_cols=$(tput cols)
-_rows=$(tput lines)
-
 _draw() {
-    local _cols _rows
-    _cols=$(tput cols)
-    _rows=$(tput lines)
+    local cols rows
+    cols=$(tput cols)
+    rows=$(tput lines)
 
-    local _count
-    _count=$(shellframe_editor_line_count "main")
-    local _row
-    _row=$(shellframe_editor_row "main")
-    local _col
-    _col=$(shellframe_editor_col "main")
-    local _vtop
-    _vtop=$(shellframe_editor_vtop "main")
+    local count row col
+    count=$(shellframe_editor_line_count "main")
+    row=$(shellframe_editor_row "main")
+    col=$(shellframe_editor_col "main")
 
     # Header bar (row 1)
-    printf '\033[1;1H\033[2K' >/dev/tty
-    printf '\033[7m%-*s\033[0m' "$_cols" \
-        "  shellframe editor  |  row $(( _row + 1 ))/$_count  col $(( _col + 1 ))  |  Ctrl-D submit  Ctrl-C quit" \
+    printf '\033[1;1H\033[2K\033[7m%-*s\033[0m' "$cols" \
+        "  shellframe editor  |  ln $(( row + 1 ))/$count  col $(( col + 1 ))  |  Ctrl-D submit  Ctrl-C quit" \
         >/dev/tty
 
-    # Editor body (rows 2 .. _rows-1)
-    local _body_rows=$(( _rows - 2 ))
-    shellframe_editor_render 2 1 "$_cols" "$_body_rows"
+    # Editor body (rows 2 .. rows-1)
+    local body_rows=$(( rows - 2 ))
+    shellframe_editor_render 2 1 "$cols" "$body_rows"
 
     # Footer bar (last row)
-    printf '\033[%d;1H\033[2K' "$_rows" >/dev/tty
-    printf '\033[2m%-*s\033[0m' "$_cols" \
+    printf '\033[%d;1H\033[2K\033[2m%-*s\033[0m' "$rows" "$cols" \
         "  ↑↓←→ navigate  Enter newline  Bksp/Del delete  Ctrl-K/U/W kill  Ctrl-D submit" \
         >/dev/tty
 }
@@ -96,26 +94,26 @@ _draw
 
 result=""
 key=""
-rc=0
 while true; do
     shellframe_read_key key
 
     shellframe_editor_on_key "$key"
-    rc=$?
-
-    if (( rc == 2 )); then
-        # Ctrl-D: submit
-        result="$SHELLFRAME_EDITOR_RESULT"
-        break
-    elif [[ "$key" == $'\x03' ]]; then
-        # Ctrl-C: quit without output
-        break
-    fi
+    case $? in
+        2)  # Ctrl-D: submit
+            result="$SHELLFRAME_EDITOR_RESULT"
+            break
+            ;;
+        *)  # Ctrl-C is caught by the INT trap above
+            ;;
+    esac
 
     _draw
 done
 
-_editor_exit
-trap - INT TERM
+# Disable EXIT trap before controlled exit so _cleanup isn't called twice.
+trap - EXIT INT TERM
+_cleanup
 
+# Print result to stdout (on a fresh line so it doesn't run into shell prompt)
+printf '\n' >/dev/tty
 [[ -n "$result" ]] && printf '%s\n' "$result"
