@@ -60,9 +60,10 @@ shellframe_tabbar_render() {
     (( _active >= _n )) && _active=$(( _n - 1 )) || true
     (( _active < 0 ))   && _active=0             || true
 
-    # ANSI highlight for active tab: reverse video
     local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
+    local _bold="${SHELLFRAME_BOLD:-$'\033[1m'}"
     local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
+    local _focused="${SHELLFRAME_TABBAR_FOCUSED:-0}"
 
     printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
 
@@ -89,10 +90,12 @@ shellframe_tabbar_render() {
             _tlen=$_remaining
         fi
 
+        # Active tab: bold, default background (clear).
+        # Inactive tabs: reverse video (white background), normal weight.
         if (( _i == _active )); then
-            printf '%s%s%s' "$_rev" "$_tab" "$_rst" >/dev/tty
+            printf '%s%s%s' "$_bold" "$_tab" "$_rst" >/dev/tty
         else
-            printf '%s' "$_tab" >/dev/tty
+            printf '%s%s%s' "$_rev" "$_tab" "$_rst" >/dev/tty
         fi
 
         (( _remaining -= _tlen ))
@@ -104,12 +107,16 @@ shellframe_tabbar_render() {
         fi
     done
 
-    # Pad remaining space
-    local _k=0
-    while (( _k < _remaining )); do
-        printf ' ' >/dev/tty
-        (( _k++ ))
-    done
+    # Fill remaining space with reverse video to complete the solid bar.
+    if (( _remaining > 0 )); then
+        printf '%s' "$_rev" >/dev/tty
+        local _k=0
+        while (( _k < _remaining )); do
+            printf ' ' >/dev/tty
+            (( _k++ ))
+        done
+        printf '%s' "$_rst" >/dev/tty
+    fi
 
     # Leave cursor at start of row (component contract)
     printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty

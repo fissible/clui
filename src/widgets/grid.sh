@@ -205,8 +205,35 @@ shellframe_grid_render() {
     local _n_vis_seps=0
     (( ${#_vis_sep_x[@]} > 0 )) && _n_vis_seps=${#_vis_sep_x[@]}
 
+    # Compute _trailing_vis_cols: how many tail columns fit in _width when starting
+    # from the right end, using pixel arithmetic.  This gives the correct _max_left
+    # so the last column is always fully visible at maximum scroll — not partially
+    # clipped as it would be if _n_vis_cols (computed at the current scroll position)
+    # were used instead.
+    local _trailing_vis_cols=0 _trailing_px=0 _tcw _tneed
+    for (( _ci=_ncols-1; _ci>=0; _ci-- )); do
+        _tcw="${SHELLFRAME_GRID_COL_WIDTHS[$_ci]:-10}"
+        _tneed=$(( _trailing_vis_cols > 0 ? _tcw + 1 : _tcw ))
+        (( _trailing_px + _tneed > _width )) && break
+        _trailing_px=$(( _trailing_px + _tneed ))
+        (( _trailing_vis_cols++ ))
+    done
+    (( _trailing_vis_cols < 1 )) && _trailing_vis_cols=1
+
+    # Detect right end-of-data border: draw │ after the last column when it is the
+    # final column globally AND it fully fits within the render region.
+    local _right_border_x=-1
+    if (( _n_vis_cols > 0 && _ncols > 0 )); then
+        local _last_vi=$(( _n_vis_cols - 1 ))
+        local _last_ci="${_vis_cols[$_last_vi]}"
+        local _last_end=$(( ${_vis_x[$_last_vi]} + ${SHELLFRAME_GRID_COL_WIDTHS[$_last_ci]:-10} ))
+        if (( _last_ci == _ncols - 1 && _last_end < _width )); then
+            _right_border_x=$_last_end
+        fi
+    fi
+
     # Update scroll viewport dimensions so clamping is correct on the next keypress.
-    shellframe_scroll_resize "$_ctx" "$_data_height" "$_ncols"
+    shellframe_scroll_resize "$_ctx" "$_data_height" "$_trailing_vis_cols"
 
     # ── Header label row ──────────────────────────────────────────────────────
     if (( _has_header )); then
@@ -219,13 +246,14 @@ shellframe_grid_render() {
             local _cw="${SHELLFRAME_GRID_COL_WIDTHS[$_ci]:-10}"
             local _hdr=""
             (( _ci < _n_headers )) && _hdr="${SHELLFRAME_GRID_HEADERS[$_ci]}"
-            local _avail=$(( _width - _xoff ))
-            (( _avail > _cw )) && _avail="$_cw"
+            local _pad_xoff=$(( _xoff + 1 ))
+            local _avail=$(( _width - _pad_xoff ))
+            (( _avail > _cw - 1 )) && _avail=$(( _cw - 1 ))
             (( _avail <= 0 )) && continue
             local _clipped
             _clipped=$(shellframe_str_clip_ellipsis "$_hdr" \
                 "${_bold}${_white}${_hdr}${_rst}" "$_avail")
-            printf '\033[%d;%dH%s' "$_top" "$(( _left + _xoff ))" "$_clipped" >/dev/tty
+            printf '\033[%d;%dH%s' "$_top" "$(( _left + _pad_xoff ))" "$_clipped" >/dev/tty
 
             # Separator after this header
             if (( _vi < _n_vis_seps )); then
@@ -234,6 +262,12 @@ shellframe_grid_render() {
                     "$_gray" "${_vis_sep_char[$_vi]}" "$_rst" >/dev/tty
             fi
         done
+
+        # Right end-of-data border in header label row
+        if (( _right_border_x >= 0 )); then
+            printf '\033[%d;%dH%s│%s' \
+                "$_top" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >/dev/tty
+        fi
 
         # ── Header separator row: ─── with ┼/╋ at column separator positions ──
         printf '\033[%d;%dH%s' "$(( _top + 1 ))" "$_left" "$_gray" >/dev/tty
@@ -246,9 +280,11 @@ shellframe_grid_render() {
             printf '%s' "${_vis_sep_junc[$_bvi]}" >/dev/tty
             _prev_x=$(( _sep_x + 1 ))
         done
-        # Remaining dashes to the right edge
+        # Remaining dashes to the right edge (or to the right border position)
+        local _dash_end=$(( _right_border_x >= 0 ? _right_border_x : _width ))
         local _bdi
-        for (( _bdi=_prev_x; _bdi<_width; _bdi++ )); do printf '─' >/dev/tty; done
+        for (( _bdi=_prev_x; _bdi<_dash_end; _bdi++ )); do printf '─' >/dev/tty; done
+        if (( _right_border_x >= 0 )); then printf '┘' >/dev/tty; fi
         printf '%s' "$_rst" >/dev/tty
     fi
 
@@ -269,7 +305,7 @@ shellframe_grid_render() {
         [[ "$_ridx" -ge "$_nrows" ]] && continue
 
         local _is_cursor=0
-        (( _ridx == _cursor )) && _is_cursor=1
+        (( _ridx == _cursor && ${SHELLFRAME_GRID_FOCUSED:-0} )) && _is_cursor=1
 
         # Multi-select checkbox prefix for the first visible column
         local _prefix=""
@@ -291,8 +327,9 @@ shellframe_grid_render() {
             _ci="${_vis_cols[$_vi]}"
             local _xoff="${_vis_x[$_vi]}"
             local _cw="${SHELLFRAME_GRID_COL_WIDTHS[$_ci]:-10}"
-            local _avail=$(( _width - _xoff ))
-            (( _avail > _cw )) && _avail="$_cw"
+            local _pad_xoff=$(( _xoff + 1 ))
+            local _avail=$(( _width - _pad_xoff ))
+            (( _avail > _cw - 1 )) && _avail=$(( _cw - 1 ))
             (( _avail <= 0 )) && continue
 
             local _didx=$(( _ridx * _ncols + _ci ))
@@ -308,7 +345,7 @@ shellframe_grid_render() {
             _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_avail")
             local _padded
             _padded=$(shellframe_str_pad "$_text" "$_clipped" "$_avail")
-            printf '\033[%d;%dH%s' "$_row" "$(( _left + _xoff ))" "$_padded" >/dev/tty
+            printf '\033[%d;%dH%s' "$_row" "$(( _left + _pad_xoff ))" "$_padded" >/dev/tty
 
             # Separator after this column.
             # Cursor row: separator inherits the active reverse-video attribute.
@@ -328,6 +365,12 @@ shellframe_grid_render() {
         done
 
         (( _is_cursor )) && printf '%s' "$_rst" >/dev/tty
+
+        # Right end-of-data border in data row (only for rows that have data)
+        if (( _right_border_x >= 0 && _ridx < _nrows )); then
+            printf '\033[%d;%dH%s│%s' \
+                "$_row" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >/dev/tty
+        fi
     done
 
     # Leave cursor at last row, column left (component contract)
