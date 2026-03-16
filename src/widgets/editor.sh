@@ -549,9 +549,15 @@ _shellframe_ed_move_up() {
         (( _cur_vrow == 0 )) && return 0
         local _target_vrow=$(( _cur_vrow - 1 ))
 
-        local _cur_c _cur_s _cur_l
-        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
-        local _vis_col=$(( _col - _cur_s ))
+        # Goal column: persist preferred visual column across blank/short lines.
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _vis_col="${!_goal_col_var:--1}"
+        if (( _vis_col < 0 )); then
+            local _cur_c _cur_s _cur_l
+            _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+            _vis_col=$(( _col - _cur_s ))
+            printf -v "$_goal_col_var" '%d' "$_vis_col"
+        fi
 
         local _tgt_c _tgt_s _tgt_l
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
@@ -575,11 +581,19 @@ _shellframe_ed_move_up() {
     else
         (( _row == 0 )) && return 0
         local _new_row=$(( _row - 1 ))
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _effective_col="${!_goal_col_var:--1}"
+        if (( _effective_col < 0 )); then
+            _effective_col="$_col"
+            printf -v "$_goal_col_var" '%d' "$_col"
+        fi
         printf -v "$_row_var" '%d' "$_new_row"
         local _line
         _shellframe_ed_get_line "$_ctx" "$_new_row" _line
         local _len="${#_line}"
-        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+        local _new_col="$_effective_col"
+        (( _new_col > _len )) && _new_col="$_len"
+        printf -v "$_col_var" '%d' "$_new_col"
     fi
 }
 
@@ -602,9 +616,15 @@ _shellframe_ed_move_down() {
         (( _cur_vrow >= _total_vrows - 1 )) && return 0
         local _target_vrow=$(( _cur_vrow + 1 ))
 
-        local _cur_c _cur_s _cur_l
-        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
-        local _vis_col=$(( _col - _cur_s ))
+        # Goal column: persist preferred visual column across blank/short lines.
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _vis_col="${!_goal_col_var:--1}"
+        if (( _vis_col < 0 )); then
+            local _cur_c _cur_s _cur_l
+            _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+            _vis_col=$(( _col - _cur_s ))
+            printf -v "$_goal_col_var" '%d' "$_vis_col"
+        fi
 
         local _tgt_c _tgt_s _tgt_l
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
@@ -628,11 +648,19 @@ _shellframe_ed_move_down() {
     else
         (( _row >= _count - 1 )) && return 0
         local _new_row=$(( _row + 1 ))
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _effective_col="${!_goal_col_var:--1}"
+        if (( _effective_col < 0 )); then
+            _effective_col="$_col"
+            printf -v "$_goal_col_var" '%d' "$_col"
+        fi
         printf -v "$_row_var" '%d' "$_new_row"
         local _line
         _shellframe_ed_get_line "$_ctx" "$_new_row" _line
         local _len="${#_line}"
-        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+        local _new_col="$_effective_col"
+        (( _new_col > _len )) && _new_col="$_len"
+        printf -v "$_col_var" '%d' "$_new_col"
     fi
 }
 
@@ -653,9 +681,15 @@ _shellframe_ed_page_up() {
         local _target_vrow=$(( _cur_vrow - _vrows ))
         (( _target_vrow < 0 )) && _target_vrow=0
 
-        local _cur_c _cur_s _cur_l
-        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
-        local _vis_col=$(( _col - _cur_s ))
+        # Goal column: persist preferred visual column across blank/short lines.
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _vis_col="${!_goal_col_var:--1}"
+        if (( _vis_col < 0 )); then
+            local _cur_c _cur_s _cur_l
+            _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+            _vis_col=$(( _col - _cur_s ))
+            printf -v "$_goal_col_var" '%d' "$_vis_col"
+        fi
 
         local _tgt_c _tgt_s _tgt_l
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
@@ -679,11 +713,19 @@ _shellframe_ed_page_up() {
     else
         local _new_row=$(( _row - _vrows ))
         (( _new_row < 0 )) && _new_row=0
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _effective_col="${!_goal_col_var:--1}"
+        if (( _effective_col < 0 )); then
+            _effective_col="$_col"
+            printf -v "$_goal_col_var" '%d' "$_col"
+        fi
         printf -v "$_row_var" '%d' "$_new_row"
         local _line
         _shellframe_ed_get_line "$_ctx" "$_new_row" _line
         local _len="${#_line}"
-        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+        local _new_col="$_effective_col"
+        (( _new_col > _len )) && _new_col="$_len"
+        printf -v "$_col_var" '%d' "$_new_col"
     fi
 }
 
@@ -708,9 +750,15 @@ _shellframe_ed_page_down() {
         local _target_vrow=$(( _cur_vrow + _vrows ))
         (( _target_vrow >= _total_vrows )) && _target_vrow=$(( _total_vrows - 1 ))
 
-        local _cur_c _cur_s _cur_l
-        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
-        local _vis_col=$(( _col - _cur_s ))
+        # Goal column: persist preferred visual column across blank/short lines.
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _vis_col="${!_goal_col_var:--1}"
+        if (( _vis_col < 0 )); then
+            local _cur_c _cur_s _cur_l
+            _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+            _vis_col=$(( _col - _cur_s ))
+            printf -v "$_goal_col_var" '%d' "$_vis_col"
+        fi
 
         local _tgt_c _tgt_s _tgt_l
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
@@ -734,11 +782,19 @@ _shellframe_ed_page_down() {
     else
         local _new_row=$(( _row + _vrows ))
         (( _new_row >= _count )) && _new_row=$(( _count - 1 ))
+        local _goal_col_var="_SHELLFRAME_ED_${_ctx}_GOAL_COL"
+        local _effective_col="${!_goal_col_var:--1}"
+        if (( _effective_col < 0 )); then
+            _effective_col="$_col"
+            printf -v "$_goal_col_var" '%d' "$_col"
+        fi
         printf -v "$_row_var" '%d' "$_new_row"
         local _line
         _shellframe_ed_get_line "$_ctx" "$_new_row" _line
         local _len="${#_line}"
-        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+        local _new_col="$_effective_col"
+        (( _new_col > _len )) && _new_col="$_len"
+        printf -v "$_col_var" '%d' "$_new_col"
     fi
 }
 
@@ -814,8 +870,9 @@ shellframe_editor_init() {
         printf -v "_SHELLFRAME_ED_${_ctx}_COUNT" '%d' 1
     fi
 
-    printf -v "_SHELLFRAME_ED_${_ctx}_ROW" '%d' 0
-    printf -v "_SHELLFRAME_ED_${_ctx}_COL" '%d' 0
+    printf -v "_SHELLFRAME_ED_${_ctx}_ROW"      '%d' 0
+    printf -v "_SHELLFRAME_ED_${_ctx}_COL"      '%d' 0
+    printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
 }
 
 # ── shellframe_editor_render ──────────────────────────────────────────────────
@@ -986,6 +1043,7 @@ shellframe_editor_on_key() {
             [[ "$_paste_key" == "$_k_paste_end" ]] && break
             _paste_buf="${_paste_buf}${_paste_key}"
         done
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_insert_text "$_ctx" "$_paste_buf"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
@@ -995,26 +1053,31 @@ shellframe_editor_on_key() {
         return 2
 
     elif [[ "$_key" == $'\r' ]] || [[ "$_key" == $'\n' ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_newline "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
 
     elif [[ "$_key" == "$_k_bs" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_backspace "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
 
     elif [[ "$_key" == "$_k_del" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_delete_char "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
 
     elif [[ "$_key" == "$_k_left" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_move_left "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
 
     elif [[ "$_key" == "$_k_right" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_move_right "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
@@ -1030,10 +1093,12 @@ shellframe_editor_on_key() {
         return 0
 
     elif [[ "$_key" == "$_k_home" ]] || [[ "$_key" == "$_k_ctrl_a" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         printf -v "_SHELLFRAME_ED_${_ctx}_COL" '%d' 0
         return 0
 
     elif [[ "$_key" == "$_k_end" ]] || [[ "$_key" == "$_k_ctrl_e" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         local _row_var="_SHELLFRAME_ED_${_ctx}_ROW"
         local _row="${!_row_var:-0}"
         local _line
@@ -1052,21 +1117,25 @@ shellframe_editor_on_key() {
         return 0
 
     elif [[ "$_key" == "$_k_ctrl_k" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_kill_to_eol "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
 
     elif [[ "$_key" == "$_k_ctrl_u" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_kill_to_sol "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
 
     elif [[ "$_key" == "$_k_ctrl_w" ]]; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_kill_word_left "$_ctx"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0
 
     elif _shellframe_ed_is_printable "$_key"; then
+        printf -v "_SHELLFRAME_ED_${_ctx}_GOAL_COL" '%d' -1
         _shellframe_ed_insert_char "$_ctx" "$_key"
         _shellframe_ed_ensure_visible "$_ctx"
         return 0

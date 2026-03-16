@@ -683,6 +683,98 @@ assert_output "start"  shellframe_editor_line "ed" 0
 assert_output "middle" shellframe_editor_line "ed" 1
 assert_output "end"    shellframe_editor_line "ed" 2
 
+# ── goal column ───────────────────────────────────────────────────────────────
+
+_reset_goal_col() {
+    SHELLFRAME_EDITOR_WRAP=1
+    SHELLFRAME_EDITOR_CTX="ed"
+    SHELLFRAME_EDITOR_FOCUSED=0
+    SHELLFRAME_EDITOR_LINES=("hello world" "" "hello world")
+    shellframe_editor_init "ed" 10
+    printf -v "_SHELLFRAME_ED_ed_VWIDTH" '%d' 80
+    _shellframe_ed_build_vmap "ed"
+}
+
+ptyunit_test_begin "goal_col: initialized to -1"
+_reset_goal_col
+_gc_var="_SHELLFRAME_ED_ed_GOAL_COL"
+assert_eq "-1" "${!_gc_var:-0}" "GOAL_COL starts at -1"
+
+ptyunit_test_begin "goal_col: preserved through blank line (wrap=1)"
+_reset_goal_col
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 5
+# Down → blank line row=1, col forced to 0; GOAL_COL stores 5
+_shellframe_ed_move_down "ed"
+assert_output "1" shellframe_editor_row "ed"
+assert_output "0" shellframe_editor_col "ed"
+# Down again → row=2, GOAL_COL=5 restores col=5
+_shellframe_ed_move_down "ed"
+assert_output "2" shellframe_editor_row "ed"
+assert_output "5" shellframe_editor_col "ed"
+
+ptyunit_test_begin "goal_col: clamps to short line, restores on longer line (wrap=1)"
+_reset_goal_col
+_shellframe_ed_set_line "ed" 1 "hi"
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 9
+printf -v _SHELLFRAME_ED_ed_GOAL_COL '%d' -1
+# Down → row=1 "hi" (len=2), col clamps to 2; GOAL_COL stores 9
+_shellframe_ed_move_down "ed"
+assert_output "1" shellframe_editor_row "ed"
+assert_output "2" shellframe_editor_col "ed"
+# Down again → row=2 "hello world" (len=11), GOAL_COL=9 → col=9
+_shellframe_ed_move_down "ed"
+assert_output "2" shellframe_editor_row "ed"
+assert_output "9" shellframe_editor_col "ed"
+
+ptyunit_test_begin "goal_col: resets on left key"
+_reset_goal_col
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 5
+printf -v _SHELLFRAME_ED_ed_GOAL_COL '%d' -1
+_shellframe_ed_move_down "ed"
+_shellframe_ed_move_up "ed"
+_gc_var="_SHELLFRAME_ED_ed_GOAL_COL"
+assert_eq "5" "${!_gc_var:-X}" "goal_col stored as 5 after vertical nav"
+shellframe_editor_on_key $'\033[D'
+assert_eq "-1" "${!_gc_var:-X}" "goal_col reset to -1 after left"
+
+ptyunit_test_begin "goal_col: resets on printable char"
+_reset_goal_col
+printf -v _SHELLFRAME_ED_ed_GOAL_COL '%d' 7
+_gc_var="_SHELLFRAME_ED_ed_GOAL_COL"
+shellframe_editor_on_key "a"
+assert_eq "-1" "${!_gc_var:-X}" "goal_col reset after printable char"
+
+ptyunit_test_begin "goal_col: resets on right key"
+_reset_goal_col
+printf -v _SHELLFRAME_ED_ed_GOAL_COL '%d' 7
+_gc_var="_SHELLFRAME_ED_ed_GOAL_COL"
+shellframe_editor_on_key $'\033[C'
+assert_eq "-1" "${!_gc_var:-X}" "goal_col reset after right"
+
+ptyunit_test_begin "goal_col: resets on home key"
+_reset_goal_col
+printf -v _SHELLFRAME_ED_ed_GOAL_COL '%d' 7
+_gc_var="_SHELLFRAME_ED_ed_GOAL_COL"
+shellframe_editor_on_key $'\033[H'
+assert_eq "-1" "${!_gc_var:-X}" "goal_col reset after home"
+
+ptyunit_test_begin "goal_col: up then down returns to original col (wrap=1)"
+_reset_goal_col
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 2
+printf -v _SHELLFRAME_ED_ed_COL '%d' 8
+printf -v _SHELLFRAME_ED_ed_GOAL_COL '%d' -1
+# Up → blank line row=1 col=0 (GOAL_COL=8 stored)
+_shellframe_ed_move_up "ed"
+assert_output "1" shellframe_editor_row "ed"
+assert_output "0" shellframe_editor_col "ed"
+# Up again → row=0 "hello world", col restored to 8
+_shellframe_ed_move_up "ed"
+assert_output "0" shellframe_editor_row "ed"
+assert_output "8" shellframe_editor_col "ed"
+
 # ── on_focus ──────────────────────────────────────────────────────────────────
 
 ptyunit_test_begin "on_focus: sets FOCUSED=1"
