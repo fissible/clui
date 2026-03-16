@@ -423,6 +423,206 @@ _reset
 shellframe_editor_on_key $'\t'
 assert_eq "1" "$?" "tab returns 1"
 
+# ── _shellframe_ed_line_segments ─────────────────────────────────────────────
+
+ptyunit_test_begin "line_segments: empty line → 0:0"
+assert_output "0:0" _shellframe_ed_line_segments "" 80
+
+ptyunit_test_begin "line_segments: short line → single segment 0:N"
+assert_output "0:5" _shellframe_ed_line_segments "hello" 80
+
+ptyunit_test_begin "line_segments: line exactly at width → single segment"
+assert_output "0:5" _shellframe_ed_line_segments "hello" 5
+
+ptyunit_test_begin "line_segments: soft wrap at last space before width"
+# "hello world" width=7: space at index 5 → seg0="hello "(0:6), seg1="world"(6:5)
+assert_output "0:6 6:5" _shellframe_ed_line_segments "hello world" 7
+
+ptyunit_test_begin "line_segments: hard wrap at width when no space found"
+# "helloworld" width=6: no space → hard wrap → 0:6, 6:4
+assert_output "0:6 6:4" _shellframe_ed_line_segments "helloworld" 6
+
+ptyunit_test_begin "line_segments: multi-segment with repeated spaces"
+# "ab cde fg" width=4: space at index 2 → 0:3("ab "); then "cde fg" space at 3 → 3:4("cde "); then "fg"=7:2
+assert_output "0:3 3:4 7:2" _shellframe_ed_line_segments "ab cde fg" 4
+
+# ── _shellframe_ed_build_vmap / _shellframe_ed_vrow_count ─────────────────────
+
+_setup_vmap() {
+    # _setup_vmap width line0 line1 ...
+    local _w="$1"; shift
+    SHELLFRAME_EDITOR_LINES=("$@")
+    SHELLFRAME_EDITOR_CTX="ed"
+    shellframe_editor_init "ed" 10
+    printf -v "_SHELLFRAME_ED_ed_VWIDTH" '%d' "$_w"
+    _shellframe_ed_build_vmap "ed"
+}
+
+ptyunit_test_begin "vrow_count: 2 short lines → 2 visual rows (no wrap)"
+_setup_vmap 80 "hello" "world"
+assert_output "2" _shellframe_ed_vrow_count "ed"
+
+ptyunit_test_begin "vrow_count: 1 wrapping line → 2 visual rows"
+_setup_vmap 7 "hello world"
+assert_output "2" _shellframe_ed_vrow_count "ed"
+
+ptyunit_test_begin "vrow_count: 2 lines one wrapping → 3 visual rows"
+_setup_vmap 7 "hello world" "hi"
+assert_output "3" _shellframe_ed_vrow_count "ed"
+
+# ── _shellframe_ed_cursor_to_vrow ─────────────────────────────────────────────
+
+ptyunit_test_begin "cursor_to_vrow: col 0 on first line → vrow 0"
+_setup_vmap 7 "hello world" "hi"
+_cv=99
+_shellframe_ed_cursor_to_vrow "ed" 0 0 _cv
+assert_eq "0" "$_cv" "vrow should be 0"
+
+ptyunit_test_begin "cursor_to_vrow: col 3 on first line (before wrap) → vrow 0"
+_setup_vmap 7 "hello world" "hi"
+_cv=99
+_shellframe_ed_cursor_to_vrow "ed" 0 3 _cv
+assert_eq "0" "$_cv" "vrow should be 0"
+
+ptyunit_test_begin "cursor_to_vrow: col at seg boundary → resolves to next vrow"
+# "hello world" width=7: seg0=0:6, seg1=6:5
+# col=6 matches both seg_start=0 (≤6) and seg_start=6 (≤6); last wins → vrow 1
+_setup_vmap 7 "hello world" "hi"
+_cv=99
+_shellframe_ed_cursor_to_vrow "ed" 0 6 _cv
+assert_eq "1" "$_cv" "vrow should be 1 (boundary belongs to next segment)"
+
+ptyunit_test_begin "cursor_to_vrow: col on second content line → vrow 2"
+_setup_vmap 7 "hello world" "hi"
+_cv=99
+_shellframe_ed_cursor_to_vrow "ed" 1 1 _cv
+assert_eq "2" "$_cv" "vrow should be 2"
+
+# ── wrap=1 up/down: visual row movement, vis_col preservation ─────────────────
+
+_reset_wrap1_narrow() {
+    SHELLFRAME_EDITOR_WRAP=1
+    SHELLFRAME_EDITOR_CTX="ed"
+    SHELLFRAME_EDITOR_FOCUSED=0
+    SHELLFRAME_EDITOR_RESULT=""
+    SHELLFRAME_EDITOR_LINES=("$@")
+    shellframe_editor_init "ed" 10
+    printf -v "_SHELLFRAME_ED_ed_VWIDTH" '%d' 7
+}
+
+ptyunit_test_begin "wrap1 up: moves from vrow 1 to vrow 0, preserves vis_col"
+# "hello world" wraps at width=7: vrow0="hello "(0:6), vrow1="world"(6:5)
+# Start at col=8 on row 0 (vrow 1, vis_col=8-6=2); move up → vrow 0, new_col=0+2=2
+_reset_wrap1_narrow "hello world"
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 8
+SHELLFRAME_EDITOR_WRAP=1
+_shellframe_ed_build_vmap "ed"
+_shellframe_ed_move_up "ed"
+assert_output "0" shellframe_editor_row "ed"
+assert_output "2" shellframe_editor_col "ed"
+
+ptyunit_test_begin "wrap1 down: moves from vrow 0 to vrow 1, preserves vis_col"
+# Start at col=2 on row 0 (vrow 0, vis_col=2); move down → vrow 1, new_col=6+2=8
+_reset_wrap1_narrow "hello world"
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 2
+SHELLFRAME_EDITOR_WRAP=1
+_shellframe_ed_build_vmap "ed"
+_shellframe_ed_move_down "ed"
+assert_output "0" shellframe_editor_row "ed"
+assert_output "8" shellframe_editor_col "ed"
+
+ptyunit_test_begin "wrap1 up: clamps vis_col to target segment length"
+# vrow0="hello "(0:6, len=6); vrow1="world"(6:5)
+# Start at col=11 (end of "world", vis_col=11-6=5); move up → vrow0, new_col=0+5=5
+# clamped to tgt_s+tgt_l=0+6=6? No: clamped only if new_col > tgt_s+tgt_l
+# 5 > 6? No → new_col=5 (not clamped)
+_reset_wrap1_narrow "hello world"
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 11
+SHELLFRAME_EDITOR_WRAP=1
+_shellframe_ed_build_vmap "ed"
+_shellframe_ed_move_up "ed"
+assert_output "0" shellframe_editor_row "ed"
+assert_output "5" shellframe_editor_col "ed"
+
+ptyunit_test_begin "wrap1 up: at vrow 0 is no-op"
+_reset_wrap1_narrow "hello world"
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 0
+SHELLFRAME_EDITOR_WRAP=1
+_shellframe_ed_build_vmap "ed"
+_shellframe_ed_move_up "ed"
+assert_output "0" shellframe_editor_row "ed"
+assert_output "0" shellframe_editor_col "ed"
+
+# ── wrap=0 HSCROLL (lazy / cursor-anchored) ───────────────────────────────────
+
+_reset_nowrap() {
+    SHELLFRAME_EDITOR_WRAP=0
+    SHELLFRAME_EDITOR_CTX="ed"
+    SHELLFRAME_EDITOR_FOCUSED=0
+    SHELLFRAME_EDITOR_RESULT=""
+    SHELLFRAME_EDITOR_LINES=("01234567890123456789")  # 20-char line
+    shellframe_editor_init "ed" 10
+    printf -v "_SHELLFRAME_ED_ed_VWIDTH" '%d' 10  # 10-char viewport
+}
+
+_hscroll_ed() {
+    local _v="_SHELLFRAME_ED_ed_HSCROLL"
+    printf '%d' "${!_v:-0}"
+}
+
+ptyunit_test_begin "hscroll: starts at 0"
+_reset_nowrap
+assert_output "0" _hscroll_ed
+
+ptyunit_test_begin "hscroll: stays 0 while cursor within viewport"
+_reset_nowrap
+# Move right 9 times → col=9, still within [0..9], hscroll stays 0
+_hi=0
+while (( _hi < 9 )); do
+    shellframe_editor_on_key $'\033[C'
+    (( _hi++ )) || true
+done
+assert_output "9" shellframe_editor_col "ed"
+assert_output "0" _hscroll_ed
+
+ptyunit_test_begin "hscroll: advances lazily when cursor goes off right edge"
+_reset_nowrap
+# Move right 10 times → col=10, col >= hscroll+width=0+10 → hscroll=1
+_hi=0
+while (( _hi < 10 )); do
+    shellframe_editor_on_key $'\033[C'
+    (( _hi++ )) || true
+done
+assert_output "10" shellframe_editor_col "ed"
+assert_output "1" _hscroll_ed
+
+ptyunit_test_begin "hscroll: stays put while cursor moves left within viewport"
+# col=10, hscroll=1; move left 5 times → col=5, still >= hscroll=1, hscroll stays 1
+_hi=0
+while (( _hi < 5 )); do
+    shellframe_editor_on_key $'\033[D'
+    (( _hi++ )) || true
+done
+assert_output "5" shellframe_editor_col "ed"
+assert_output "1" _hscroll_ed
+
+ptyunit_test_begin "hscroll: decreases when cursor goes below left edge"
+# col=5, hscroll=1; move left 5 more → col=0, col < hscroll=1 → hscroll=0
+_hi=0
+while (( _hi < 5 )); do
+    shellframe_editor_on_key $'\033[D'
+    (( _hi++ )) || true
+done
+assert_output "0" shellframe_editor_col "ed"
+assert_output "0" _hscroll_ed
+
+# Restore wrap=1 for subsequent tests
+SHELLFRAME_EDITOR_WRAP=1
+
 # ── on_focus ──────────────────────────────────────────────────────────────────
 
 ptyunit_test_begin "on_focus: sets FOCUSED=1"

@@ -7,12 +7,18 @@
 # ── Overview ──────────────────────────────────────────────────────────────────
 #
 # A scrollable multiline text editor.  Lines are stored as individually named
-# globals (_SHELLFRAME_ED_${ctx}_L0, _L1, …) so that multiple editor instances
-# can coexist via different SHELLFRAME_EDITOR_CTX values.
+# globals (_SHELLFRAME_ED_${ctx}_L0, _L1, …).
 #
-# The cursor is a (row, col) pair.  Vertical scroll is tracked as VTOP — the
-# first visible content row — and recomputed after every operation that changes
-# the cursor row.
+# WRAP MODE (SHELLFRAME_EDITOR_WRAP=1, the default):
+#   Lines are soft-wrapped at word boundaries to fit the viewport width.
+#   Up/Down move by visual row (a wrapped segment), not by content line.
+#   VTOP is in visual-row space.  No horizontal scroll.
+#
+# NO-WRAP MODE (SHELLFRAME_EDITOR_WRAP=0):
+#   All lines are rendered from a shared horizontal scroll offset (HSCROLL).
+#   HSCROLL is lazy/cursor-anchored: it only moves when the cursor would
+#   go off-screen, so the view stays put while the cursor moves across it.
+#   VTOP is in content-row space.
 #
 # ── Input globals ─────────────────────────────────────────────────────────────
 #
@@ -20,54 +26,40 @@
 #   SHELLFRAME_EDITOR_CTX       — context name (default: "editor")
 #   SHELLFRAME_EDITOR_FOCUSED   — 0 (default) | 1
 #   SHELLFRAME_EDITOR_FOCUSABLE — 1 (default) | 0
+#   SHELLFRAME_EDITOR_WRAP      — 1 (default, soft word wrap) | 0 (h-scroll)
 #
 # ── Output globals ────────────────────────────────────────────────────────────
 #
-#   SHELLFRAME_EDITOR_RESULT    — full text (newline-joined) set on Ctrl-D (rc=2)
+#   SHELLFRAME_EDITOR_RESULT  — full text (newline-joined) set on Ctrl-D (rc=2)
 #
 # ── Public API ────────────────────────────────────────────────────────────────
 #
 #   shellframe_editor_init [ctx] [viewport_rows]
-#     Initialise state from SHELLFRAME_EDITOR_LINES (or a single empty line).
-#
 #   shellframe_editor_render top left width height
-#     Draw visible lines.  Output to /dev/tty.
-#
-#   shellframe_editor_on_key key
-#     Returns:
-#       0  — key handled (app shell should redraw)
-#       1  — key not handled (pass to next handler)
-#       2  — Ctrl-D pressed (submit; read SHELLFRAME_EDITOR_RESULT)
-#
+#   shellframe_editor_on_key key  → 0 handled | 1 unhandled | 2 submit
 #   shellframe_editor_on_focus focused
-#
 #   shellframe_editor_size → "1 1 0 0"
-#
 #   shellframe_editor_get_text [ctx] [out_var]
-#     Return current content as a single newline-joined string.
-#
 #   shellframe_editor_set_text [ctx] text
-#     Replace content (splits on literal newlines; resets cursor to 0,0).
-#
-#   shellframe_editor_row [ctx]   → current cursor row
-#   shellframe_editor_col [ctx]   → current cursor column
-#   shellframe_editor_line_count [ctx]   → number of lines
-#   shellframe_editor_line [ctx] idx    → text of line at idx
-#   shellframe_editor_vtop [ctx]  → current vertical scroll offset
+#   shellframe_editor_row [ctx]        → cursor content row
+#   shellframe_editor_col [ctx]        → cursor column
+#   shellframe_editor_line_count [ctx] → number of content lines
+#   shellframe_editor_line [ctx] idx   → text of content line at idx
+#   shellframe_editor_vtop [ctx]       → current scroll offset (visual rows)
 #
 # ── Keyboard bindings ─────────────────────────────────────────────────────────
 #
-#   ↑ / ↓               — move cursor up / down (col clamped to new line length)
-#   ← / →               — move left / right (wraps across line boundaries)
-#   Home / Ctrl-A        — move to start of current line
-#   End  / Ctrl-E        — move to end of current line
-#   Page Up / Page Down  — move cursor by viewport height
-#   Enter                — insert newline (split line at cursor)
+#   ↑ / ↓               — move up/down one visual row
+#   ← / →               — move left/right (wraps across line boundaries)
+#   Home / Ctrl-A        — start of current content line
+#   End  / Ctrl-E        — end of current content line
+#   Page Up / Page Down  — move cursor by viewport height (visual rows)
+#   Enter                — insert newline
 #   Backspace            — delete char before cursor; at col 0 join with prev line
 #   Delete               — delete char at cursor; at EOL join with next line
 #   Ctrl-K               — kill to end of line; at EOL join with next line
 #   Ctrl-U               — kill to start of line
-#   Ctrl-W               — kill word left (whitespace + word)
+#   Ctrl-W               — kill word left
 #   Ctrl-D               — submit (rc=2, SHELLFRAME_EDITOR_RESULT set)
 
 SHELLFRAME_EDITOR_CTX="editor"
@@ -75,8 +67,9 @@ SHELLFRAME_EDITOR_FOCUSED=0
 SHELLFRAME_EDITOR_FOCUSABLE=1
 SHELLFRAME_EDITOR_LINES=()
 SHELLFRAME_EDITOR_RESULT=""
+SHELLFRAME_EDITOR_WRAP=1
 
-# ── Internal: line array accessors ───────────────────────────────────────────
+# ── Internal: line array ──────────────────────────────────────────────────────
 
 _shellframe_ed_get_line() {
     local _ctx="$1" _i="$2" _out="${3:-}"
@@ -93,7 +86,6 @@ _shellframe_ed_set_line() {
     printf -v "_SHELLFRAME_ED_${_ctx}_L${_i}" '%s' "$_val"
 }
 
-# Insert a line at position _idx, shifting subsequent lines up by one.
 _shellframe_ed_insert_line_at() {
     local _ctx="$1" _idx="$2" _line="$3"
     local _count_var="_SHELLFRAME_ED_${_ctx}_COUNT"
@@ -107,7 +99,6 @@ _shellframe_ed_insert_line_at() {
     printf -v "$_count_var" '%d' "$(( _count + 1 ))"
 }
 
-# Remove the line at position _idx, shifting subsequent lines down by one.
 _shellframe_ed_delete_line_at() {
     local _ctx="$1" _idx="$2"
     local _count_var="_SHELLFRAME_ED_${_ctx}_COUNT"
@@ -117,36 +108,200 @@ _shellframe_ed_delete_line_at() {
         local _src_var="_SHELLFRAME_ED_${_ctx}_L$(( _j + 1 ))"
         printf -v "_SHELLFRAME_ED_${_ctx}_L${_j}" '%s' "${!_src_var:-}"
     done
-    # Clear the now-unused last slot
     printf -v "_SHELLFRAME_ED_${_ctx}_L$(( _count - 1 ))" '%s' ""
     printf -v "$_count_var" '%d' "$(( _count - 1 ))"
 }
 
+# ── Internal: word-wrap vmap ──────────────────────────────────────────────────
+#
+# The vmap is a space-separated string of "content_row:seg_start:seg_len"
+# entries, one per visual row.  It is rebuilt by _shellframe_ed_build_vmap
+# and stored in _SHELLFRAME_ED_${ctx}_VMAP.
+#
+# Soft-wrap rule: wrap at the last space at or before the viewport width
+# (the space is included in the segment so the cursor can sit on it);
+# fall back to a hard wrap at the viewport width when no space is found.
+
+# Compute "start:len" pairs for visual segments of one line (stdout).
+_shellframe_ed_line_segments() {
+    local _line="$1" _width="$2"
+    local _len="${#_line}"
+
+    if (( _len == 0 )); then printf '0:0'; return; fi
+    if (( _width <= 0 || _len <= _width )); then printf '0:%d' "$_len"; return; fi
+
+    local _result="" _pos=0
+    while (( _pos < _len )); do
+        local _remaining="${_line:$_pos}"
+        local _rlen="${#_remaining}"
+
+        if (( _rlen <= _width )); then
+            _result="${_result:+$_result }${_pos}:${_rlen}"
+            break
+        fi
+
+        # Find last space at or before _width; include it in this segment
+        local _seg_len="$_width"
+        local _next_pos=$(( _pos + _width ))
+        local _i=$(( _width - 1 ))
+        while (( _i >= 0 )); do
+            if [[ "${_remaining:$_i:1}" == " " ]]; then
+                _seg_len=$(( _i + 1 ))
+                _next_pos=$(( _pos + _i + 1 ))
+                break
+            fi
+            (( _i-- ))
+        done
+
+        _result="${_result:+$_result }${_pos}:${_seg_len}"
+        _pos="$_next_pos"
+    done
+
+    [[ -z "$_result" ]] && _result="0:0"
+    printf '%s' "$_result"
+}
+
+# Build (or rebuild) the vmap for the current content and viewport width.
+_shellframe_ed_build_vmap() {
+    local _ctx="$1"
+    local _width_var="_SHELLFRAME_ED_${_ctx}_VWIDTH"
+    local _width="${!_width_var:-80}"
+    local _count_var="_SHELLFRAME_ED_${_ctx}_COUNT"
+    local _count="${!_count_var:-1}"
+    local _vmap="" _i
+
+    for (( _i=0; _i<_count; _i++ )); do
+        local _line
+        _shellframe_ed_get_line "$_ctx" "$_i" _line
+        local _segs
+        _segs=$(_shellframe_ed_line_segments "$_line" "$_width")
+        local _old_IFS="$IFS"
+        local _seg_arr
+        IFS=' ' read -r -a _seg_arr <<< "$_segs"
+        IFS="$_old_IFS"
+        local _s
+        for _s in "${_seg_arr[@]+"${_seg_arr[@]}"}"; do
+            _vmap="${_vmap:+$_vmap }${_i}:${_s}"
+        done
+    done
+
+    [[ -z "$_vmap" ]] && _vmap="0:0:0"
+    printf -v "_SHELLFRAME_ED_${_ctx}_VMAP" '%s' "$_vmap"
+}
+
+# Total number of visual rows.
+_shellframe_ed_vrow_count() {
+    local _ctx="$1"
+    local _vmap_var="_SHELLFRAME_ED_${_ctx}_VMAP"
+    local _vmap="${!_vmap_var:-}"
+    if [[ -z "$_vmap" ]]; then printf '1'; return; fi
+    local _arr
+    local _old_IFS="$IFS"
+    IFS=' ' read -r -a _arr <<< "$_vmap"
+    IFS="$_old_IFS"
+    printf '%d' "${#_arr[@]}"
+}
+
+# Given (content_row, col), find the visual row index.
+# The last segment whose seg_start <= col (for the given content row) wins,
+# so the cursor always resolves to a unique visual row.
+_shellframe_ed_cursor_to_vrow() {
+    local _ctx="$1" _crow="$2" _ccol="$3" _out_var="$4"
+    local _vmap_var="_SHELLFRAME_ED_${_ctx}_VMAP"
+    local _vmap="${!_vmap_var:-0:0:0}"
+    local _arr
+    local _old_IFS="$IFS"
+    IFS=' ' read -r -a _arr <<< "$_vmap"
+    IFS="$_old_IFS"
+
+    local _vi _result=0
+    for (( _vi=0; _vi<${#_arr[@]}; _vi++ )); do
+        local _e="${_arr[$_vi]}"
+        local _c="${_e%%:*}"; local _r="${_e#*:}"; local _s="${_r%%:*}"
+        if (( _c < _crow )); then continue; fi
+        if (( _c > _crow )); then break; fi
+        # same content row: update result as long as cursor is at or past seg_start
+        (( _ccol >= _s )) && _result="$_vi"
+    done
+    printf -v "$_out_var" '%d' "$_result"
+}
+
+# Info for one visual row: sets content_row, seg_start, seg_len in named vars.
+_shellframe_ed_vrow_info() {
+    local _ctx="$1" _vrow="$2" _c_out="$3" _s_out="$4" _l_out="$5"
+    local _vmap_var="_SHELLFRAME_ED_${_ctx}_VMAP"
+    local _vmap="${!_vmap_var:-0:0:0}"
+    local _arr
+    local _old_IFS="$IFS"
+    IFS=' ' read -r -a _arr <<< "$_vmap"
+    IFS="$_old_IFS"
+    local _e="${_arr[$_vrow]:-0:0:0}"
+    local _c="${_e%%:*}"; local _r="${_e#*:}"; local _s="${_r%%:*}"; local _l="${_r##*:}"
+    printf -v "$_c_out" '%d' "$_c"
+    printf -v "$_s_out" '%d' "$_s"
+    printf -v "$_l_out" '%d' "$_l"
+}
+
 # ── Internal: scroll ──────────────────────────────────────────────────────────
 
-# Recompute VTOP so the cursor row is within the vertical viewport.
 _shellframe_ed_ensure_visible() {
     local _ctx="$1"
     local _row_var="_SHELLFRAME_ED_${_ctx}_ROW"
+    local _col_var="_SHELLFRAME_ED_${_ctx}_COL"
     local _vtop_var="_SHELLFRAME_ED_${_ctx}_VTOP"
     local _vrows_var="_SHELLFRAME_ED_${_ctx}_VROWS"
     local _count_var="_SHELLFRAME_ED_${_ctx}_COUNT"
     local _row="${!_row_var:-0}"
+    local _col="${!_col_var:-0}"
     local _vtop="${!_vtop_var:-0}"
     local _vrows="${!_vrows_var:-10}"
     local _count="${!_count_var:-1}"
+    local _wrap="${SHELLFRAME_EDITOR_WRAP:-1}"
 
-    if (( _row < _vtop )); then
-        _vtop="$_row"
-    elif (( _vrows > 0 && _row >= _vtop + _vrows )); then
-        _vtop=$(( _row - _vrows + 1 ))
+    if (( _wrap )); then
+        # VTOP is in visual-row space
+        _shellframe_ed_build_vmap "$_ctx"
+        local _cursor_vrow
+        _shellframe_ed_cursor_to_vrow "$_ctx" "$_row" "$_col" _cursor_vrow
+
+        if (( _cursor_vrow < _vtop )); then
+            _vtop="$_cursor_vrow"
+        elif (( _vrows > 0 && _cursor_vrow >= _vtop + _vrows )); then
+            _vtop=$(( _cursor_vrow - _vrows + 1 ))
+        fi
+
+        local _total_vrows
+        _total_vrows=$(_shellframe_ed_vrow_count "$_ctx")
+        local _max_vtop=$(( _total_vrows - _vrows ))
+        (( _max_vtop < 0 )) && _max_vtop=0
+    else
+        # VTOP is in content-row space
+        if (( _row < _vtop )); then
+            _vtop="$_row"
+        elif (( _vrows > 0 && _row >= _vtop + _vrows )); then
+            _vtop=$(( _row - _vrows + 1 ))
+        fi
+
+        local _max_vtop=$(( _count - _vrows ))
+        (( _max_vtop < 0 )) && _max_vtop=0
+
+        # Lazy horizontal scroll: only move when cursor goes off-screen
+        local _hscroll_var="_SHELLFRAME_ED_${_ctx}_HSCROLL"
+        local _hscroll="${!_hscroll_var:-0}"
+        local _width_var="_SHELLFRAME_ED_${_ctx}_VWIDTH"
+        local _width="${!_width_var:-80}"
+
+        if (( _col < _hscroll )); then
+            _hscroll="$_col"
+        elif (( _width > 0 && _col >= _hscroll + _width )); then
+            _hscroll=$(( _col - _width + 1 ))
+        fi
+        (( _hscroll < 0 )) && _hscroll=0
+        printf -v "$_hscroll_var" '%d' "$_hscroll"
     fi
 
-    local _max_vtop=$(( _count - _vrows ))
-    (( _max_vtop < 0 )) && _max_vtop=0
     (( _vtop < 0 ))         && _vtop=0
     (( _vtop > _max_vtop )) && _vtop="$_max_vtop"
-
     printf -v "$_vtop_var" '%d' "$_vtop"
 }
 
@@ -183,9 +338,7 @@ _shellframe_ed_newline() {
     local _col="${!_col_var:-0}"
     local _line
     _shellframe_ed_get_line "$_ctx" "$_row" _line
-    # Current line keeps only the text before the cursor
     _shellframe_ed_set_line "$_ctx" "$_row" "${_line:0:$_col}"
-    # New line gets the text after the cursor
     _shellframe_ed_insert_line_at "$_ctx" "$(( _row + 1 ))" "${_line:$_col}"
     printf -v "$_row_var" '%d' "$(( _row + 1 ))"
     printf -v "$_col_var" '%d' 0
@@ -205,7 +358,6 @@ _shellframe_ed_backspace() {
             "${_line:0:$(( _col - 1 ))}${_line:$_col}"
         printf -v "$_col_var" '%d' "$(( _col - 1 ))"
     elif (( _row > 0 )); then
-        # Join current line onto the end of the previous line
         local _prev _cur
         _shellframe_ed_get_line "$_ctx" "$(( _row - 1 ))" _prev
         _shellframe_ed_get_line "$_ctx" "$_row" _cur
@@ -233,7 +385,6 @@ _shellframe_ed_delete_char() {
         _shellframe_ed_set_line "$_ctx" "$_row" \
             "${_line:0:$_col}${_line:$(( _col + 1 ))}"
     elif (( _row < _count - 1 )); then
-        # At EOL: join next line onto current
         local _next
         _shellframe_ed_get_line "$_ctx" "$(( _row + 1 ))" _next
         _shellframe_ed_set_line "$_ctx" "$_row" "${_line}${_next}"
@@ -288,12 +439,8 @@ _shellframe_ed_kill_word_left() {
     _shellframe_ed_get_line "$_ctx" "$_row" _line
 
     local _p="$_col"
-    while (( _p > 0 )) && [[ "${_line:$(( _p - 1 )):1}" == ' ' ]]; do
-        (( _p-- ))
-    done
-    while (( _p > 0 )) && [[ "${_line:$(( _p - 1 )):1}" != ' ' ]]; do
-        (( _p-- ))
-    done
+    while (( _p > 0 )) && [[ "${_line:$(( _p - 1 )):1}" == ' ' ]]; do (( _p-- )); done
+    while (( _p > 0 )) && [[ "${_line:$(( _p - 1 )):1}" != ' ' ]]; do (( _p-- )); done
 
     _shellframe_ed_set_line "$_ctx" "$_row" "${_line:0:$_p}${_line:$_col}"
     printf -v "$_col_var" '%d' "$_p"
@@ -338,21 +485,44 @@ _shellframe_ed_move_right() {
     fi
 }
 
+# Move up/down by one visual row (wrap=1) or one content row (wrap=0).
+# visual_col = col - seg_start is preserved across the move.
 _shellframe_ed_move_up() {
     local _ctx="$1"
     local _row_var="_SHELLFRAME_ED_${_ctx}_ROW"
     local _col_var="_SHELLFRAME_ED_${_ctx}_COL"
     local _row="${!_row_var:-0}"
     local _col="${!_col_var:-0}"
+    local _wrap="${SHELLFRAME_EDITOR_WRAP:-1}"
 
-    (( _row == 0 )) && return 0
+    if (( _wrap )); then
+        _shellframe_ed_build_vmap "$_ctx"
+        local _cur_vrow
+        _shellframe_ed_cursor_to_vrow "$_ctx" "$_row" "$_col" _cur_vrow
+        (( _cur_vrow == 0 )) && return 0
+        local _target_vrow=$(( _cur_vrow - 1 ))
 
-    local _new_row=$(( _row - 1 ))
-    printf -v "$_row_var" '%d' "$_new_row"
-    local _line
-    _shellframe_ed_get_line "$_ctx" "$_new_row" _line
-    local _len="${#_line}"
-    (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+        local _cur_c _cur_s _cur_l
+        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+        local _vis_col=$(( _col - _cur_s ))
+
+        local _tgt_c _tgt_s _tgt_l
+        _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
+
+        local _new_col=$(( _tgt_s + _vis_col ))
+        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+
+        printf -v "$_row_var" '%d' "$_tgt_c"
+        printf -v "$_col_var" '%d' "$_new_col"
+    else
+        (( _row == 0 )) && return 0
+        local _new_row=$(( _row - 1 ))
+        printf -v "$_row_var" '%d' "$_new_row"
+        local _line
+        _shellframe_ed_get_line "$_ctx" "$_new_row" _line
+        local _len="${#_line}"
+        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+    fi
 }
 
 _shellframe_ed_move_down() {
@@ -363,15 +533,38 @@ _shellframe_ed_move_down() {
     local _row="${!_row_var:-0}"
     local _col="${!_col_var:-0}"
     local _count="${!_count_var:-1}"
+    local _wrap="${SHELLFRAME_EDITOR_WRAP:-1}"
 
-    (( _row >= _count - 1 )) && return 0
+    if (( _wrap )); then
+        _shellframe_ed_build_vmap "$_ctx"
+        local _cur_vrow
+        _shellframe_ed_cursor_to_vrow "$_ctx" "$_row" "$_col" _cur_vrow
+        local _total_vrows
+        _total_vrows=$(_shellframe_ed_vrow_count "$_ctx")
+        (( _cur_vrow >= _total_vrows - 1 )) && return 0
+        local _target_vrow=$(( _cur_vrow + 1 ))
 
-    local _new_row=$(( _row + 1 ))
-    printf -v "$_row_var" '%d' "$_new_row"
-    local _line
-    _shellframe_ed_get_line "$_ctx" "$_new_row" _line
-    local _len="${#_line}"
-    (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+        local _cur_c _cur_s _cur_l
+        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+        local _vis_col=$(( _col - _cur_s ))
+
+        local _tgt_c _tgt_s _tgt_l
+        _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
+
+        local _new_col=$(( _tgt_s + _vis_col ))
+        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+
+        printf -v "$_row_var" '%d' "$_tgt_c"
+        printf -v "$_col_var" '%d' "$_new_col"
+    else
+        (( _row >= _count - 1 )) && return 0
+        local _new_row=$(( _row + 1 ))
+        printf -v "$_row_var" '%d' "$_new_row"
+        local _line
+        _shellframe_ed_get_line "$_ctx" "$_new_row" _line
+        local _len="${#_line}"
+        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+    fi
 }
 
 _shellframe_ed_page_up() {
@@ -382,14 +575,36 @@ _shellframe_ed_page_up() {
     local _row="${!_row_var:-0}"
     local _col="${!_col_var:-0}"
     local _vrows="${!_vrows_var:-10}"
+    local _wrap="${SHELLFRAME_EDITOR_WRAP:-1}"
 
-    local _new_row=$(( _row - _vrows ))
-    (( _new_row < 0 )) && _new_row=0
-    printf -v "$_row_var" '%d' "$_new_row"
-    local _line
-    _shellframe_ed_get_line "$_ctx" "$_new_row" _line
-    local _len="${#_line}"
-    (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+    if (( _wrap )); then
+        _shellframe_ed_build_vmap "$_ctx"
+        local _cur_vrow
+        _shellframe_ed_cursor_to_vrow "$_ctx" "$_row" "$_col" _cur_vrow
+        local _target_vrow=$(( _cur_vrow - _vrows ))
+        (( _target_vrow < 0 )) && _target_vrow=0
+
+        local _cur_c _cur_s _cur_l
+        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+        local _vis_col=$(( _col - _cur_s ))
+
+        local _tgt_c _tgt_s _tgt_l
+        _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
+
+        local _new_col=$(( _tgt_s + _vis_col ))
+        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+
+        printf -v "$_row_var" '%d' "$_tgt_c"
+        printf -v "$_col_var" '%d' "$_new_col"
+    else
+        local _new_row=$(( _row - _vrows ))
+        (( _new_row < 0 )) && _new_row=0
+        printf -v "$_row_var" '%d' "$_new_row"
+        local _line
+        _shellframe_ed_get_line "$_ctx" "$_new_row" _line
+        local _len="${#_line}"
+        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+    fi
 }
 
 _shellframe_ed_page_down() {
@@ -402,20 +617,42 @@ _shellframe_ed_page_down() {
     local _col="${!_col_var:-0}"
     local _count="${!_count_var:-1}"
     local _vrows="${!_vrows_var:-10}"
+    local _wrap="${SHELLFRAME_EDITOR_WRAP:-1}"
 
-    local _new_row=$(( _row + _vrows ))
-    (( _new_row >= _count )) && _new_row=$(( _count - 1 ))
-    printf -v "$_row_var" '%d' "$_new_row"
-    local _line
-    _shellframe_ed_get_line "$_ctx" "$_new_row" _line
-    local _len="${#_line}"
-    (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+    if (( _wrap )); then
+        _shellframe_ed_build_vmap "$_ctx"
+        local _cur_vrow
+        _shellframe_ed_cursor_to_vrow "$_ctx" "$_row" "$_col" _cur_vrow
+        local _total_vrows
+        _total_vrows=$(_shellframe_ed_vrow_count "$_ctx")
+        local _target_vrow=$(( _cur_vrow + _vrows ))
+        (( _target_vrow >= _total_vrows )) && _target_vrow=$(( _total_vrows - 1 ))
+
+        local _cur_c _cur_s _cur_l
+        _shellframe_ed_vrow_info "$_ctx" "$_cur_vrow" _cur_c _cur_s _cur_l
+        local _vis_col=$(( _col - _cur_s ))
+
+        local _tgt_c _tgt_s _tgt_l
+        _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
+
+        local _new_col=$(( _tgt_s + _vis_col ))
+        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+
+        printf -v "$_row_var" '%d' "$_tgt_c"
+        printf -v "$_col_var" '%d' "$_new_col"
+    else
+        local _new_row=$(( _row + _vrows ))
+        (( _new_row >= _count )) && _new_row=$(( _count - 1 ))
+        printf -v "$_row_var" '%d' "$_new_row"
+        local _line
+        _shellframe_ed_get_line "$_ctx" "$_new_row" _line
+        local _len="${#_line}"
+        (( _col > _len )) && printf -v "$_col_var" '%d' "$_len"
+    fi
 }
 
 # ── shellframe_editor_get_text ────────────────────────────────────────────────
 
-# Return current content as a single newline-joined string.
-# Stores in out_var if given, otherwise prints to stdout.
 shellframe_editor_get_text() {
     local _ctx="${1:-${SHELLFRAME_EDITOR_CTX:-editor}}"
     local _out="${2:-}"
@@ -440,7 +677,6 @@ shellframe_editor_get_text() {
 
 # ── shellframe_editor_set_text ────────────────────────────────────────────────
 
-# Replace content by splitting text on literal newlines.  Resets cursor to 0,0.
 shellframe_editor_set_text() {
     local _ctx="${1:-${SHELLFRAME_EDITOR_CTX:-editor}}"
     local _text="$2"
@@ -470,8 +706,10 @@ shellframe_editor_init() {
     local _ctx="${1:-${SHELLFRAME_EDITOR_CTX:-editor}}"
     local _vrows="${2:-10}"
 
-    printf -v "_SHELLFRAME_ED_${_ctx}_VTOP"  '%d' 0
-    printf -v "_SHELLFRAME_ED_${_ctx}_VROWS" '%d' "$_vrows"
+    printf -v "_SHELLFRAME_ED_${_ctx}_VTOP"    '%d' 0
+    printf -v "_SHELLFRAME_ED_${_ctx}_VROWS"   '%d' "$_vrows"
+    printf -v "_SHELLFRAME_ED_${_ctx}_VWIDTH"  '%d' 80
+    printf -v "_SHELLFRAME_ED_${_ctx}_HSCROLL" '%d' 0
 
     if [[ "${#SHELLFRAME_EDITOR_LINES[@]}" -gt 0 ]]; then
         local _i
@@ -495,16 +733,16 @@ shellframe_editor_render() {
     local _top="$1" _left="$2" _width="$3" _height="$4"
     local _ctx="${SHELLFRAME_EDITOR_CTX:-editor}"
     local _focused="${SHELLFRAME_EDITOR_FOCUSED:-0}"
+    local _wrap="${SHELLFRAME_EDITOR_WRAP:-1}"
 
-    # Keep viewport height in sync, then re-clamp scroll
-    printf -v "_SHELLFRAME_ED_${_ctx}_VROWS" '%d' "$_height"
+    printf -v "_SHELLFRAME_ED_${_ctx}_VROWS"  '%d' "$_height"
+    printf -v "_SHELLFRAME_ED_${_ctx}_VWIDTH" '%d' "$_width"
     _shellframe_ed_ensure_visible "$_ctx"
 
     local _vtop_var="_SHELLFRAME_ED_${_ctx}_VTOP"
     local _row_var="_SHELLFRAME_ED_${_ctx}_ROW"
     local _col_var="_SHELLFRAME_ED_${_ctx}_COL"
     local _count_var="_SHELLFRAME_ED_${_ctx}_COUNT"
-
     local _vtop="${!_vtop_var:-0}"
     local _row="${!_row_var:-0}"
     local _col="${!_col_var:-0}"
@@ -513,56 +751,102 @@ shellframe_editor_render() {
     local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
     local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
 
-    local _r
-    for (( _r=0; _r<_height; _r++ )); do
-        local _screen_row=$(( _top + _r ))
-        local _content_row=$(( _vtop + _r ))
+    if (( _wrap )); then
+        # ── Wrap mode ────────────────────────────────────────────────────────
+        # vmap was just rebuilt by ensure_visible
+        local _vmap_var="_SHELLFRAME_ED_${_ctx}_VMAP"
+        local _vmap="${!_vmap_var:-0:0:0}"
+        local _vmap_arr
+        local _old_IFS="$IFS"
+        IFS=' ' read -r -a _vmap_arr <<< "$_vmap"
+        IFS="$_old_IFS"
+        local _total_vrows="${#_vmap_arr[@]}"
 
-        # Clear row
-        printf '\033[%d;%dH%*s' "$_screen_row" "$_left" "$_width" '' >/dev/tty
+        # Pre-compute cursor's visual row for highlight matching
+        local _cursor_vrow=0
+        (( _focused )) && _shellframe_ed_cursor_to_vrow "$_ctx" "$_row" "$_col" _cursor_vrow
 
-        [[ $_content_row -ge $_count ]] && continue
+        local _r
+        for (( _r=0; _r<_height; _r++ )); do
+            local _screen_row=$(( _top + _r ))
+            local _vr=$(( _vtop + _r ))
 
-        local _line
-        _shellframe_ed_get_line "$_ctx" "$_content_row" _line
+            printf '\033[%d;%dH%*s' "$_screen_row" "$_left" "$_width" '' >/dev/tty
+            [[ $_vr -ge $_total_vrows ]] && continue
 
-        # Horizontal scroll: keep the cursor column visible on the active row
-        local _hscroll=0
-        if (( _content_row == _row && _col >= _width )); then
-            _hscroll=$(( _col - _width + 1 ))
-        fi
+            local _e="${_vmap_arr[$_vr]}"
+            local _c="${_e%%:*}"; local _rest="${_e#*:}"
+            local _s="${_rest%%:*}"; local _l="${_rest##*:}"
 
-        local _vis="${_line:$_hscroll:$_width}"
-        local _vlen="${#_vis}"
+            local _line
+            _shellframe_ed_get_line "$_ctx" "$_c" _line
+            local _vis="${_line:$_s:$_l}"
+            local _vlen="${#_vis}"
 
-        printf '\033[%d;%dH' "$_screen_row" "$_left" >/dev/tty
+            printf '\033[%d;%dH' "$_screen_row" "$_left" >/dev/tty
 
-        if (( _focused && _content_row == _row )); then
-            local _cur_vis=$(( _col - _hscroll ))
-
-            # Text before cursor
-            printf '%s' "${_vis:0:$_cur_vis}" >/dev/tty
-
-            # Cursor character (highlighted)
-            if (( _cur_vis < _vlen )); then
-                printf '%s%s%s' "$_rev" "${_vis:$_cur_vis:1}" "$_rst" >/dev/tty
-                printf '%s' "${_vis:$(( _cur_vis + 1 ))}" >/dev/tty
+            if (( _focused && _vr == _cursor_vrow )); then
+                local _cur_vis=$(( _col - _s ))
+                printf '%s' "${_vis:0:$_cur_vis}" >/dev/tty
+                if (( _cur_vis < _vlen )); then
+                    printf '%s%s%s' "$_rev" "${_vis:$_cur_vis:1}" "$_rst" >/dev/tty
+                    printf '%s' "${_vis:$(( _cur_vis + 1 ))}" >/dev/tty
+                else
+                    printf '%s %s' "$_rev" "$_rst" >/dev/tty
+                fi
+                local _drawn=$(( _vlen < _width ? _vlen : _width ))
+                (( _cur_vis >= _vlen )) && (( _drawn++ )) || true
+                local _k=0
+                while (( _k < _width - _drawn )); do
+                    printf ' ' >/dev/tty
+                    (( _k++ ))
+                done
             else
-                printf '%s %s' "$_rev" "$_rst" >/dev/tty
+                printf '%s' "$_vis" >/dev/tty
             fi
+        done
 
-            # Pad remaining columns
-            local _drawn=$(( _vlen < _width ? _vlen : _width ))
-            (( _cur_vis >= _vlen )) && (( _drawn++ )) || true
-            local _k=0
-            while (( _k < _width - _drawn )); do
-                printf ' ' >/dev/tty
-                (( _k++ ))
-            done
-        else
-            printf '%s' "$_vis" >/dev/tty
-        fi
-    done
+    else
+        # ── No-wrap mode: all rows share HSCROLL ────────────────────────────
+        local _hscroll_var="_SHELLFRAME_ED_${_ctx}_HSCROLL"
+        local _hscroll="${!_hscroll_var:-0}"
+
+        local _r
+        for (( _r=0; _r<_height; _r++ )); do
+            local _screen_row=$(( _top + _r ))
+            local _content_row=$(( _vtop + _r ))
+
+            printf '\033[%d;%dH%*s' "$_screen_row" "$_left" "$_width" '' >/dev/tty
+            [[ $_content_row -ge $_count ]] && continue
+
+            local _line
+            _shellframe_ed_get_line "$_ctx" "$_content_row" _line
+            local _vis="${_line:$_hscroll:$_width}"
+            local _vlen="${#_vis}"
+
+            printf '\033[%d;%dH' "$_screen_row" "$_left" >/dev/tty
+
+            if (( _focused && _content_row == _row )); then
+                local _cur_vis=$(( _col - _hscroll ))
+                printf '%s' "${_vis:0:$_cur_vis}" >/dev/tty
+                if (( _cur_vis < _vlen )); then
+                    printf '%s%s%s' "$_rev" "${_vis:$_cur_vis:1}" "$_rst" >/dev/tty
+                    printf '%s' "${_vis:$(( _cur_vis + 1 ))}" >/dev/tty
+                else
+                    printf '%s %s' "$_rev" "$_rst" >/dev/tty
+                fi
+                local _drawn=$(( _vlen < _width ? _vlen : _width ))
+                (( _cur_vis >= _vlen )) && (( _drawn++ )) || true
+                local _k=0
+                while (( _k < _width - _drawn )); do
+                    printf ' ' >/dev/tty
+                    (( _k++ ))
+                done
+            else
+                printf '%s' "$_vis" >/dev/tty
+            fi
+        done
+    fi
 
     printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >/dev/tty
 }
@@ -683,7 +967,6 @@ shellframe_editor_on_focus() {
 
 # ── shellframe_editor_size ────────────────────────────────────────────────────
 
-# min: 1×1; preferred: fill all available space (0×0)
 shellframe_editor_size() {
     printf '%d %d %d %d' 1 1 0 0
 }
