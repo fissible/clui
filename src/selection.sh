@@ -209,12 +209,19 @@ shellframe_sel_clear_all() {
 
 # ── shellframe_sel_cursor ──────────────────────────────────────────────────────
 
-# Print the current cursor index to stdout.
+# Print the current cursor index to stdout, or store in out_var if given.
+#   shellframe_sel_cursor ctx           → prints to stdout
+#   shellframe_sel_cursor ctx out_var   → stores in variable (printf -v)
 shellframe_sel_cursor() {
-    local _ctx="$1"
+    local _ctx="$1" _out="${2:-}"
     _shellframe_sel_validate_ctx "$_ctx" || return 1
     local _cursor_var="_SHELLFRAME_SEL_${_ctx}_CURSOR"
-    printf '%d' "${!_cursor_var:-0}"
+    local _val="${!_cursor_var:-0}"
+    if [[ -n "$_out" ]]; then
+        printf -v "$_out" '%d' "$_val"
+    else
+        printf '%d' "$_val"
+    fi
 }
 
 # ── shellframe_sel_count ───────────────────────────────────────────────────────

@@ -271,8 +271,12 @@ shellframe_shell() {
     local _prefix="$1"
     local _current="${2:-ROOT}"
 
+    local _saved_stty
+    _saved_stty=$(shellframe_raw_save)
     shellframe_screen_enter
-    trap 'shellframe_screen_exit' EXIT INT TERM
+    shellframe_cursor_hide
+    shellframe_raw_enter
+    trap "shellframe_raw_exit '$_saved_stty'; shellframe_cursor_show; shellframe_screen_exit" EXIT INT TERM
 
     local _k_tab="${SHELLFRAME_KEY_TAB:-$'\t'}"
     local _k_shift_tab="${SHELLFRAME_KEY_SHIFT_TAB:-$'\033[Z'}"
@@ -316,8 +320,8 @@ shellframe_shell() {
             # ── Deliver key to focused region ──────────────────────────────
             if [[ -n "$_focused" ]] && \
                declare -f "${_prefix}_${_current}_${_focused}_on_key" >/dev/null 2>&1; then
-                "${_prefix}_${_current}_${_focused}_on_key" "$_key"
-                local _rc=$?
+                local _rc=0
+                "${_prefix}_${_current}_${_focused}_on_key" "$_key" || _rc=$?
 
                 if (( _rc == 0 )); then
                     _shellframe_shell_draw "$_prefix" "$_current"
@@ -360,6 +364,8 @@ shellframe_shell() {
         done
     done
 
+    shellframe_raw_exit "$_saved_stty"
+    shellframe_cursor_show
     shellframe_screen_exit
     trap - EXIT INT TERM
 }

@@ -82,8 +82,8 @@ shellframe_list_render() {
         local _row=$(( _top + _r ))
         local _item_idx=$(( _scroll_top + _r ))
 
-        # Clear this row
-        printf '\033[%d;%dH\033[2K' "$_row" "$_left" >/dev/tty
+        # Clear this row (only within the list's own column range)
+        printf '\033[%d;%dH%*s' "$_row" "$_left" "$_width" '' >/dev/tty
 
         [[ $_item_idx -ge $_n ]] && continue
 
