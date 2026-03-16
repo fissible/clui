@@ -80,11 +80,13 @@ working interactive list selector.
 | `src/widgets/tab-bar.sh` | v2 horizontal tab bar — reverse-video active tab, left/right arrow nav |
 | `src/widgets/input-field.sh` | v2 single-line text input — cursor.sh backed, all edit keys, placeholder, mask mode |
 | `src/widgets/list.sh` | v2 scrollable selectable list — selection.sh + scroll.sh, optional multiselect |
+| `src/widgets/modal.sh` | v2 modal/dialog overlay — centered panel, message, optional input field, button row |
 | `src/widgets/action-list.sh` | v1 full-screen interactive action list |
 | `src/widgets/table.sh` | v1 full-page navigable table with headers, page chrome, scroll, and optional below-area |
 | `src/widgets/confirm.sh` | v1 modal yes/no dialog |
 | `src/widgets/alert.sh` | v1 modal informational dismiss dialog |
-| `src/app.sh` | `shellframe_app` — declarative multi-screen FSM runtime |
+| `src/shell.sh` | `shellframe_shell` — v2 composable multi-pane runtime (region layout, Tab focus, key dispatch) |
+| `src/app.sh` | `shellframe_app` — declarative multi-screen FSM runtime (v1 widgets) |
 
 → **[Full API reference](docs/api.md)**
 
@@ -115,11 +117,13 @@ shellframe/
 │   ├── text.sh            # v2 text primitive — render, align, wrap (shellframe_text_*)
 │   ├── scroll.sh          # v2 scroll state model — V+H, ensure_row/col (shellframe_scroll_*)
 │   ├── panel.sh           # v2 bordered box — styles, title, focus (shellframe_panel_*)
-│   ├── app.sh             # shellframe_app — declarative screen FSM runtime
+│   ├── shell.sh           # shellframe_shell — v2 composable multi-pane runtime
+│   ├── app.sh             # shellframe_app — declarative screen FSM runtime (v1)
 │   └── widgets/
 │       ├── tab-bar.sh     # v2 horizontal tab bar widget
 │       ├── input-field.sh # v2 single-line text input widget
 │       ├── list.sh        # v2 scrollable selectable list widget
+│       ├── modal.sh       # v2 modal/dialog overlay widget
 │       ├── action-list.sh # v1 interactive action-list widget
 │       ├── table.sh       # v1 full-page navigable table widget
 │       ├── confirm.sh     # v1 modal yes/no confirmation dialog

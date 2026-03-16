@@ -56,7 +56,7 @@ Start every new session by reading this file. Update task status here when work 
 | 11 | Selectable list (items, selection, keyboard, scroll) | M | [#11](https://github.com/fissible/shellframe/issues/11) | closed | 5,10 |
 | 12 | Input field (single-line, cursor, insert/delete, placeholder) | M | [#12](https://github.com/fissible/shellframe/issues/12) | closed | 6 |
 | 13 | Tab bar (labels, active, overflow, keyboard) | S | [#13](https://github.com/fissible/shellframe/issues/13) | closed | 3,5 |
-| 14 | Modal/dialog (overlay, focus trap, dismiss/confirm) | M | [#14](https://github.com/fissible/shellframe/issues/14) | open | 3,9 |
+| 14 | Modal/dialog (overlay, focus trap, dismiss/confirm) | M | [#14](https://github.com/fissible/shellframe/issues/14) | closed | 3,9 |
 | 15 | Tree view (expand/collapse, selection, keyboard, indent) | L | [#15](https://github.com/fissible/shellframe/issues/15) | open | 5,10,11 |
 | 16 | Text editor (multiline, cursor, scroll, submit hook) | L | [#16](https://github.com/fissible/shellframe/issues/16) | open | 6,10,12 |
 | 17 | Data grid (rows/cols, sticky header, H+V scroll, col width) | XL | [#17](https://github.com/fissible/shellframe/issues/17) | open | 5,7,10 |
@@ -68,7 +68,7 @@ Start every new session by reading this file. Update task status here when work 
 
 | # | Task                             | Effort | GH Issue | Status | Deps |
 |---|----------------------------------|--------|----------|--------|------|
-| 18 | App shell (region layout, focus switching, screen routing, modal layer) | L | [#18](https://github.com/fissible/shellframe/issues/18) | open | 1,2,3,9,14 |
+| 18 | App shell (region layout, focus switching, screen routing, modal layer) | L | [#18](https://github.com/fissible/shellframe/issues/18) | closed | 1,2,3,9,14 |
 
 ---
 
@@ -165,7 +165,7 @@ Before adding any new widget or screen:
 ## Session handoff notes
 > Update this section at the end of each session.
 
-_Last updated: 2026-03-16_
+_Last updated: 2026-03-16 (session 2)_
 - shellql repo stubbed and pushed to GitHub (https://github.com/fissible/shellql)
 - All 28 GitHub issues created: shellframe #1–18, shellql #1–9
 - PROJECT.md is the master tracking sheet; shellql/PLAN.md cross-references shellframe issues
@@ -185,4 +185,6 @@ _Last updated: 2026-03-16_
   - `src/widgets/list.sh`: scrollable list using selection.sh + scroll.sh, optional multiselect
   - Key decisions: `shellframe_sel_move ctx down` always moves 1 step (page_size only applies to page_up/page_down); field scroll is computed at render time from cursor position
 - **ptyunit migration complete** (2026-03-16): shellframe now uses ptyunit as a git submodule (`tests/ptyunit/`); `tests/assert.sh`, `tests/run.sh`, `tests/pty_run.py` removed; all test files updated to `ptyunit_test_begin`/`ptyunit_test_summary`; Docker matrix updated. 352/352 assertions pass (330 unit + 22 integration). Run with `bash tests/ptyunit/run.sh`.
-- **Next session: Phase 3 remaining — #14 Modal/dialog (deps: #3 focus, #9 panel). Phase 4 app shell (#18) follows. All deps for both are now satisfied.**
+- **Phase 3 #14 Modal/dialog complete** (2026-03-16): `src/widgets/modal.sh` — centered panel overlay, message body, optional input field, button row (Left/Right/Tab cycle, Enter confirms, Esc dismisses). SHELLFRAME_MODAL_RESULT set on rc=2. 29/29 assertions.
+- **Phase 4 #18 App shell complete** (2026-03-16): `src/shell.sh` — `shellframe_shell` v2 composable runtime. `shellframe_shell_region` registers named regions; `shellframe_shell_focus_set` queues focus by name; Tab/Shift-Tab traversal; key dispatch + screen routing via `PREFIX_SCREEN_<region>_on_key/action/quit` callbacks. 30/30 assertions. **M1 milestone: Phases 1–4 all closed.**
+- **Next session: Phase 5 mock ShellQL screens — start with #19 Welcome screen (deps: #11 list ✓, #18 shell ✓). Work in fissible/shellql repo.**
