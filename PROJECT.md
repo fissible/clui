@@ -57,7 +57,7 @@ Start every new session by reading this file. Update task status here when work 
 | 12 | Input field (single-line, cursor, insert/delete, placeholder) | M | [#12](https://github.com/fissible/shellframe/issues/12) | closed | 6 |
 | 13 | Tab bar (labels, active, overflow, keyboard) | S | [#13](https://github.com/fissible/shellframe/issues/13) | closed | 3,5 |
 | 14 | Modal/dialog (overlay, focus trap, dismiss/confirm) | M | [#14](https://github.com/fissible/shellframe/issues/14) | closed | 3,9 |
-| 15 | Tree view (expand/collapse, selection, keyboard, indent) | L | [#15](https://github.com/fissible/shellframe/issues/15) | open | 5,10,11 |
+| 15 | Tree view (expand/collapse, selection, keyboard, indent) | L | [#15](https://github.com/fissible/shellframe/issues/15) | closed | 5,10,11 |
 | 16 | Text editor (multiline, cursor, scroll, submit hook) | L | [#16](https://github.com/fissible/shellframe/issues/16) | open | 6,10,12 |
 | 17 | Data grid (rows/cols, sticky header, H+V scroll, col width) | XL | [#17](https://github.com/fissible/shellframe/issues/17) | open | 5,7,10 |
 
@@ -187,4 +187,5 @@ _Last updated: 2026-03-16 (session 2)_
 - **ptyunit migration complete** (2026-03-16): shellframe now uses ptyunit as a git submodule (`tests/ptyunit/`); `tests/assert.sh`, `tests/run.sh`, `tests/pty_run.py` removed; all test files updated to `ptyunit_test_begin`/`ptyunit_test_summary`; Docker matrix updated. 352/352 assertions pass (330 unit + 22 integration). Run with `bash tests/ptyunit/run.sh`.
 - **Phase 3 #14 Modal/dialog complete** (2026-03-16): `src/widgets/modal.sh` — centered panel overlay, message body, optional input field, button row (Left/Right/Tab cycle, Enter confirms, Esc dismisses). SHELLFRAME_MODAL_RESULT set on rc=2. 29/29 assertions.
 - **Phase 4 #18 App shell complete** (2026-03-16): `src/shell.sh` — `shellframe_shell` v2 composable runtime. `shellframe_shell_region` registers named regions; `shellframe_shell_focus_set` queues focus by name; Tab/Shift-Tab traversal; key dispatch + screen routing via `PREFIX_SCREEN_<region>_on_key/action/quit` callbacks. 30/30 assertions. **M1 milestone: Phases 1–4 all closed.**
-- **Next session: Phase 5 mock ShellQL screens — start with #19 Welcome screen (deps: #11 list ✓, #18 shell ✓). Work in fissible/shellql repo.**
+- **Phase 3 #15 Tree view complete** (2026-03-15): `src/widgets/tree.sh` — scrollable tree with expand/collapse, keyboard navigation, indent rendering. Parallel arrays (ITEMS/DEPTHS/HASCHILDREN) in pre-order. Space/Right expand, Left collapses or jumps to parent. SHELLFRAME_TREE_RESULT set on rc=2. 46/46 assertions. 457/457 total.
+- **Next session: #16 Text editor (multiline, cursor, scroll, submit hook), or Phase 5 #19 Welcome screen. Both are unblocked.**
