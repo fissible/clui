@@ -95,12 +95,13 @@ _draw
 # ── Input loop ─────────────────────────────────────────────────────────────────
 
 result=""
+key=""
+rc=0
 while true; do
-    local key
     shellframe_read_key key
 
     shellframe_editor_on_key "$key"
-    local rc=$?
+    rc=$?
 
     if (( rc == 2 )); then
         # Ctrl-D: submit
