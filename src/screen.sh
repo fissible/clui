@@ -78,8 +78,16 @@ shellframe_cursor_show() { printf '\033[?25h'; }
 #   shellframe_raw_exit "$saved_stty"
 
 shellframe_raw_save()  { stty -g 2>/dev/null; }
-shellframe_raw_enter() { stty -echo -icanon -icrnl min 1 time 0 2>/dev/null; }
+shellframe_raw_enter() {
+    stty -echo -icanon -icrnl min 1 time 0 2>/dev/null
+    # Enable bracketed paste mode: terminal wraps pasted text in
+    # ESC[200~ ... ESC[201~ so the editor can batch-insert it instantly.
+    printf '\033[?2004h' >/dev/tty
+}
 # -icrnl: stop the tty from translating CR (\r) → NL (\n) on input.
 # Without this, Enter arrives as \n, but bash's `read` strips trailing
 # newlines and returns an empty string — so \n can never be matched.
-shellframe_raw_exit()  { stty "$1" 2>/dev/null || true; }
+shellframe_raw_exit()  {
+    printf '\033[?2004l' >/dev/tty  # disable bracketed paste mode
+    stty "$1" 2>/dev/null || true
+}

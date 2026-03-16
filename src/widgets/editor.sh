@@ -305,6 +305,42 @@ _shellframe_ed_ensure_visible() {
     printf -v "$_vtop_var" '%d' "$_vtop"
 }
 
+# ── Internal: bulk insertion (for bracketed paste) ───────────────────────────
+
+# Insert a plain string at the cursor without calling ensure_visible.
+# Used internally; callers are responsible for calling ensure_visible after.
+_shellframe_ed_insert_string() {
+    local _ctx="$1" _str="$2"
+    [[ -z "$_str" ]] && return 0
+    local _row_var="_SHELLFRAME_ED_${_ctx}_ROW"
+    local _col_var="_SHELLFRAME_ED_${_ctx}_COL"
+    local _row="${!_row_var:-0}"
+    local _col="${!_col_var:-0}"
+    local _line
+    _shellframe_ed_get_line "$_ctx" "$_row" _line
+    _shellframe_ed_set_line "$_ctx" "$_row" "${_line:0:$_col}${_str}${_line:$_col}"
+    printf -v "$_col_var" '%d' "$(( _col + ${#_str} ))"
+}
+
+# Insert a (possibly multi-line) text block at the cursor.
+# Splits on \n; calls _shellframe_ed_insert_string + _shellframe_ed_newline
+# per segment.  Does NOT call ensure_visible — callers do that once at the end.
+_shellframe_ed_insert_text() {
+    local _ctx="$1" _text="$2"
+    local _remaining="$_text"
+    while true; do
+        if [[ "$_remaining" == *$'\n'* ]]; then
+            local _part="${_remaining%%$'\n'*}"
+            _shellframe_ed_insert_string "$_ctx" "$_part"
+            _shellframe_ed_newline "$_ctx"
+            _remaining="${_remaining#*$'\n'}"
+        else
+            _shellframe_ed_insert_string "$_ctx" "$_remaining"
+            break
+        fi
+    done
+}
+
 # ── Internal: printability ────────────────────────────────────────────────────
 
 _shellframe_ed_is_printable() {
@@ -874,7 +910,23 @@ shellframe_editor_on_key() {
     local _k_ctrl_u="${SHELLFRAME_KEY_CTRL_U:-$'\x15'}"
     local _k_ctrl_w="${SHELLFRAME_KEY_CTRL_W:-$'\x17'}"
 
-    if [[ "$_key" == "$_k_ctrl_d" ]]; then
+    local _k_paste_start="${SHELLFRAME_KEY_PASTE_START:-$'\033[200~'}"
+    local _k_paste_end="${SHELLFRAME_KEY_PASTE_END:-$'\033[201~'}"
+
+    if [[ "$_key" == "$_k_paste_start" ]]; then
+        # Bracketed paste: drain all keys until paste-end, then insert as one
+        # batch — single ensure_visible / vmap rebuild at the end.
+        local _paste_buf="" _paste_key=""
+        while true; do
+            shellframe_read_key _paste_key
+            [[ "$_paste_key" == "$_k_paste_end" ]] && break
+            _paste_buf="${_paste_buf}${_paste_key}"
+        done
+        _shellframe_ed_insert_text "$_ctx" "$_paste_buf"
+        _shellframe_ed_ensure_visible "$_ctx"
+        return 0
+
+    elif [[ "$_key" == "$_k_ctrl_d" ]]; then
         shellframe_editor_get_text "$_ctx" SHELLFRAME_EDITOR_RESULT
         return 2
 

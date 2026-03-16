@@ -623,6 +623,37 @@ assert_output "0" _hscroll_ed
 # Restore wrap=1 for subsequent tests
 SHELLFRAME_EDITOR_WRAP=1
 
+# ── _shellframe_ed_insert_text (bulk insert) ──────────────────────────────────
+
+ptyunit_test_begin "insert_text: inserts single-line string at cursor"
+_reset
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 0
+_shellframe_ed_insert_text "ed" "hello"
+assert_output "hello" shellframe_editor_line "ed" 0
+assert_output "5"     shellframe_editor_col  "ed"
+
+ptyunit_test_begin "insert_text: splits on newlines and inserts multiple lines"
+_reset
+_shellframe_ed_insert_text "ed" $'foo\nbar\nbaz'
+assert_output "3"   shellframe_editor_line_count "ed"
+assert_output "foo" shellframe_editor_line "ed" 0
+assert_output "bar" shellframe_editor_line "ed" 1
+assert_output "baz" shellframe_editor_line "ed" 2
+assert_output "2"   shellframe_editor_row "ed"
+assert_output "3"   shellframe_editor_col "ed"
+
+ptyunit_test_begin "insert_text: inserts mid-line and mid-document"
+_reset
+shellframe_editor_set_text "ed" $'start\nend'
+# cursor is at 0,0; move to row 0 col 5 (end of "start")
+shellframe_editor_on_key $'\033[F'
+_shellframe_ed_insert_text "ed" $'\nmiddle'
+assert_output "3"      shellframe_editor_line_count "ed"
+assert_output "start"  shellframe_editor_line "ed" 0
+assert_output "middle" shellframe_editor_line "ed" 1
+assert_output "end"    shellframe_editor_line "ed" 2
+
 # ── on_focus ──────────────────────────────────────────────────────────────────
 
 ptyunit_test_begin "on_focus: sets FOCUSED=1"

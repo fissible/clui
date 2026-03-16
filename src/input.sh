@@ -61,6 +61,9 @@ SHELLFRAME_KEY_END=$'\x1b[F'
 SHELLFRAME_KEY_DELETE=$'\x1b[3~'
 SHELLFRAME_KEY_PAGE_UP=$'\x1b[5~'
 SHELLFRAME_KEY_PAGE_DOWN=$'\x1b[6~'
+# Bracketed paste mode sequences (6-byte): enabled by shellframe_raw_enter
+SHELLFRAME_KEY_PASTE_START=$'\x1b[200~'
+SHELLFRAME_KEY_PASTE_END=$'\x1b[201~'
 
 # Read one keypress (including full escape sequences) into a variable.
 #
@@ -83,17 +86,23 @@ SHELLFRAME_KEY_PAGE_DOWN=$'\x1b[6~'
 # follow-on bytes are already in the buffer and return immediately.
 shellframe_read_key() {
     local _out_var="${1:-_SHELLFRAME_KEY}"
-    local _k _c1 _c2 _c3
+    local _k _c
     IFS= read -r -n1 -d '' _k
     if [[ "$_k" == $'\x1b' ]]; then
-        IFS= read -r -n1 -d '' -t 1 _c1
-        IFS= read -r -n1 -d '' -t 1 _c2
-        _k+="${_c1}${_c2}"
-        # 4-byte sequences: ESC [ <digit> ~  (PgUp, PgDn, Delete, etc.)
-        # Glob [0-9] matches a single digit — bash 3.2 safe.
-        if [[ "$_c1" == '[' && "$_c2" == [0-9] ]]; then
-            IFS= read -r -n1 -d '' -t 1 _c3
-            _k+="${_c3}"
+        IFS= read -r -n1 -d '' -t 1 _c
+        _k+="${_c}"
+        # CSI (ESC [) and SS3 (ESC O): read parameter bytes until a final byte.
+        # Final bytes are letters (A-Z, a-z) or ~.  Bail on read timeout.
+        # This handles sequences of any length: 3-byte (ESC [ A), 4-byte
+        # (ESC [ 3 ~), and longer like bracketed paste (ESC [ 2 0 0 ~).
+        if [[ "$_c" == '[' || "$_c" == 'O' ]]; then
+            while true; do
+                IFS= read -r -n1 -d '' -t 1 _c || break
+                _k+="${_c}"
+                case "$_c" in
+                    [A-Za-z~]) break ;;
+                esac
+            done
         fi
     fi
     printf -v "$_out_var" '%s' "$_k"
