@@ -547,6 +547,35 @@ _shellframe_ed_move_up "ed"
 assert_output "0" shellframe_editor_row "ed"
 assert_output "5" shellframe_editor_col "ed"
 
+ptyunit_test_begin "wrap1 up: does not land at segment boundary (core flicker bug)"
+# "hello world" width=7: vrow0=s:0,l:6 ("hello ") [intermediate], vrow1=s:6,l:5 ("world") [last]
+# From vrow1 col=11 (EOL), vis_col=11-6=5. Move up: new_col=0+5=5.
+# 5 >= 0+6=6? No — no clamp. cursor_to_vrow(0,5): s=0≤5→vrow0; s=6≤5?No → vrow0. ✓
+_reset_wrap1_narrow "hello world"
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 11
+SHELLFRAME_EDITOR_WRAP=1
+_shellframe_ed_build_vmap "ed"
+_shellframe_ed_move_up "ed"
+# Must land on content row 0, col within vrow 0 (0..5), NOT 6 (which = vrow 1 start)
+assert_output "0"  shellframe_editor_row "ed"
+_bc=$(shellframe_editor_col "ed")
+assert_eq "1" "$(( _bc < 6 ))" "col must be < 6 (not at next-seg boundary)"
+
+ptyunit_test_begin "wrap1 up: wide vis_col clamped to last char of intermediate segment"
+# "abc def" width=3: "0:3 3:1 4:3". vrow2=s:4,l:3 ("def") last; vrow1=s:3,l:1 (" ") intermed.
+# From vrow2 col=7 (EOL), vis_col=3. Move up to vrow1: new_col=3+3=6, 6>=3+1=4 → clamp to 3.
+# cursor_to_vrow(0,3): s=0≤3→vrow0, s=3≤3→vrow1, s=4≤3?No → vrow1. ✓ (col=3 is on vrow1)
+_reset_wrap1_narrow "abc def"
+printf -v _SHELLFRAME_ED_ed_VWIDTH '%d' 3
+printf -v _SHELLFRAME_ED_ed_ROW '%d' 0
+printf -v _SHELLFRAME_ED_ed_COL '%d' 7
+SHELLFRAME_EDITOR_WRAP=1
+_shellframe_ed_build_vmap "ed"
+_shellframe_ed_move_up "ed"
+assert_output "0"  shellframe_editor_row "ed"
+assert_output "3"  shellframe_editor_col "ed"
+
 ptyunit_test_begin "wrap1 up: at vrow 0 is no-op"
 _reset_wrap1_narrow "hello world"
 printf -v _SHELLFRAME_ED_ed_ROW '%d' 0

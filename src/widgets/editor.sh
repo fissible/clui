@@ -557,7 +557,18 @@ _shellframe_ed_move_up() {
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
 
         local _new_col=$(( _tgt_s + _vis_col ))
-        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+        local _tgt_line _tgt_line_len
+        _shellframe_ed_get_line "$_ctx" "$_tgt_c" _tgt_line
+        _tgt_line_len="${#_tgt_line}"
+        if (( _tgt_l == 0 )); then
+            _new_col=0
+        elif (( _tgt_s + _tgt_l < _tgt_line_len )); then
+            # intermediate segment: boundary col = start of next segment, keep within
+            (( _new_col >= _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l - 1 ))
+        else
+            # last segment of line: cursor may sit at EOL
+            (( _new_col > _tgt_line_len )) && _new_col="$_tgt_line_len"
+        fi
 
         printf -v "$_row_var" '%d' "$_tgt_c"
         printf -v "$_col_var" '%d' "$_new_col"
@@ -599,7 +610,18 @@ _shellframe_ed_move_down() {
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
 
         local _new_col=$(( _tgt_s + _vis_col ))
-        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+        local _tgt_line _tgt_line_len
+        _shellframe_ed_get_line "$_ctx" "$_tgt_c" _tgt_line
+        _tgt_line_len="${#_tgt_line}"
+        if (( _tgt_l == 0 )); then
+            _new_col=0
+        elif (( _tgt_s + _tgt_l < _tgt_line_len )); then
+            # intermediate segment: boundary col = start of next segment, keep within
+            (( _new_col >= _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l - 1 ))
+        else
+            # last segment of line: cursor may sit at EOL
+            (( _new_col > _tgt_line_len )) && _new_col="$_tgt_line_len"
+        fi
 
         printf -v "$_row_var" '%d' "$_tgt_c"
         printf -v "$_col_var" '%d' "$_new_col"
@@ -639,7 +661,18 @@ _shellframe_ed_page_up() {
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
 
         local _new_col=$(( _tgt_s + _vis_col ))
-        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+        local _tgt_line _tgt_line_len
+        _shellframe_ed_get_line "$_ctx" "$_tgt_c" _tgt_line
+        _tgt_line_len="${#_tgt_line}"
+        if (( _tgt_l == 0 )); then
+            _new_col=0
+        elif (( _tgt_s + _tgt_l < _tgt_line_len )); then
+            # intermediate segment: boundary col = start of next segment, keep within
+            (( _new_col >= _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l - 1 ))
+        else
+            # last segment of line: cursor may sit at EOL
+            (( _new_col > _tgt_line_len )) && _new_col="$_tgt_line_len"
+        fi
 
         printf -v "$_row_var" '%d' "$_tgt_c"
         printf -v "$_col_var" '%d' "$_new_col"
@@ -683,7 +716,18 @@ _shellframe_ed_page_down() {
         _shellframe_ed_vrow_info "$_ctx" "$_target_vrow" _tgt_c _tgt_s _tgt_l
 
         local _new_col=$(( _tgt_s + _vis_col ))
-        (( _tgt_l > 0 && _new_col > _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l ))
+        local _tgt_line _tgt_line_len
+        _shellframe_ed_get_line "$_ctx" "$_tgt_c" _tgt_line
+        _tgt_line_len="${#_tgt_line}"
+        if (( _tgt_l == 0 )); then
+            _new_col=0
+        elif (( _tgt_s + _tgt_l < _tgt_line_len )); then
+            # intermediate segment: boundary col = start of next segment, keep within
+            (( _new_col >= _tgt_s + _tgt_l )) && _new_col=$(( _tgt_s + _tgt_l - 1 ))
+        else
+            # last segment of line: cursor may sit at EOL
+            (( _new_col > _tgt_line_len )) && _new_col="$_tgt_line_len"
+        fi
 
         printf -v "$_row_var" '%d' "$_tgt_c"
         printf -v "$_col_var" '%d' "$_new_col"
