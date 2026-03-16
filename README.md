@@ -94,6 +94,7 @@ working interactive list selector.
 
 ## Going deeper
 
+- [**Widget showcase**](docs/showcase.md) — visual gallery: ASCII art + code for every widget
 - [**API reference**](docs/api.md) — every function, global, and callback signature
 - [**TUI skeletons**](docs/skeletons.md) — copy-paste starting points for apps and custom widgets
 - [**Hard-won lessons**](docs/hard-won-lessons.md) — 9 bash TUI pitfalls and how to avoid them
