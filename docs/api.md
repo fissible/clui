@@ -274,6 +274,86 @@ Row N         : ░ PAGE_FOOTER ░░░░░░░░░░░░░░░░
 
 ---
 
+## `src/widgets/grid.sh`
+
+**v2 composable** data grid with sticky header, `│` column separators, and independent vertical + horizontal scroll.
+
+### Setup
+
+```bash
+SHELLFRAME_GRID_ROWS=3
+SHELLFRAME_GRID_COLS=3
+SHELLFRAME_GRID_HEADERS=("id" "name" "city")
+SHELLFRAME_GRID_COL_WIDTHS=(4 15 12)   # visible chars per column; no auto-gaps
+SHELLFRAME_GRID_DATA=(                  # flat array: data[row*COLS + col]
+    "1" "Alice"   "NYC"
+    "2" "Bob"     "LA"
+    "3" "Carol"   "Chicago"
+)
+SHELLFRAME_GRID_PK_COLS=1              # optional: 1 leading PK column → ┃ separator
+shellframe_grid_init                   # or: shellframe_grid_init "myctx" 20
+```
+
+### Input globals
+
+| Global | Default | Description |
+|---|---|---|
+| `SHELLFRAME_GRID_HEADERS[@]` | `()` | Column header labels (plain text) |
+| `SHELLFRAME_GRID_COL_WIDTHS[@]` | `()` | Visible character width per column |
+| `SHELLFRAME_GRID_DATA[@]` | `()` | Flat cell array: `data[row*COLS + col]` |
+| `SHELLFRAME_GRID_ROWS` | `0` | Number of data rows |
+| `SHELLFRAME_GRID_COLS` | `0` | Number of columns |
+| `SHELLFRAME_GRID_PK_COLS` | `0` | Leading PK column count. When > 0, the separator after column `PK_COLS-1` is drawn as `┃` (data rows) / `╋` (header junction) instead of `│` / `┼`. |
+| `SHELLFRAME_GRID_CTX` | `"grid"` | Context name for selection + scroll state |
+| `SHELLFRAME_GRID_MULTISELECT` | `0` | `1` = Space toggles row selection |
+| `SHELLFRAME_GRID_FOCUSED` | `0` | Set by `on_focus`; controls focus indicator |
+| `SHELLFRAME_GRID_FOCUSABLE` | `1` | Whether the app shell should offer focus |
+
+### Functions
+
+**`shellframe_grid_init [ctx] [viewport_rows]`**
+
+Initialise (or reset) selection and scroll state. Must be called after any
+change to `SHELLFRAME_GRID_ROWS` or `SHELLFRAME_GRID_COLS`.
+
+**`shellframe_grid_render top left width height`**
+
+Draw the grid within the given region. All output to `/dev/tty`.
+
+Layout when `height ≥ 3` and `SHELLFRAME_GRID_HEADERS` is non-empty:
+```
+Row top     : bold white column labels  │  separated
+Row top+1   : ──────────────────────────┼──── (┼ at each separator; ╋ at PK boundary)
+Rows top+2+ : data rows (V-scrollable)  │  cursor row in reverse video
+```
+When no headers, data rows occupy all rows. Columns that do not fit in `width`
+are clipped; partial columns show as many characters as space allows.
+
+**`shellframe_grid_on_key key`**
+
+| Return | Meaning |
+|---|---|
+| `0` | Key handled — app shell should redraw |
+| `1` | Key not handled — pass to next handler |
+| `2` | Enter pressed — row confirmed |
+
+Built-in bindings: `↑`/`↓` move row cursor · `←`/`→` pan column viewport · `PgUp`/`PgDn` page rows · `Home`/`End` first/last row · `Enter` confirm · `Space` toggle selection (multiselect only).
+
+**`shellframe_grid_on_focus focused`** — sets `SHELLFRAME_GRID_FOCUSED`.
+
+**`shellframe_grid_size`** — prints `3 3 0 0` (min 3×3; fill preferred).
+
+### Reading results
+
+```bash
+shellframe_sel_cursor  "$SHELLFRAME_GRID_CTX"   # confirmed row index
+shellframe_scroll_top  "$SHELLFRAME_GRID_CTX"   # current V-scroll offset
+shellframe_scroll_left "$SHELLFRAME_GRID_CTX"   # current H-scroll offset (column index)
+shellframe_sel_selected "$SHELLFRAME_GRID_CTX"  # space-separated multi-select indices
+```
+
+---
+
 ## `src/widgets/confirm.sh`
 
 **`shellframe_confirm <question> [detail ...]`**
