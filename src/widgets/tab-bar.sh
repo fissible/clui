@@ -39,6 +39,7 @@ SHELLFRAME_TABBAR_ACTIVE=0
 SHELLFRAME_TABBAR_FOCUSED=0
 SHELLFRAME_TABBAR_FOCUSABLE=1
 SHELLFRAME_TABBAR_LABELS=()
+SHELLFRAME_TABBAR_BG=""   # override inactive-tab + fill background; empty = use SHELLFRAME_REVERSE
 
 # Tab separator: │ (1 terminal column, UTF-8 box-drawing)
 _SHELLFRAME_TABBAR_SEP='│'
@@ -61,6 +62,7 @@ shellframe_tabbar_render() {
     (( _active < 0 ))   && _active=0             || true
 
     local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
+    local _bg="${SHELLFRAME_TABBAR_BG:-$_rev}"
     local _bold="${SHELLFRAME_BOLD:-$'\033[1m'}"
     local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
     local _focused="${SHELLFRAME_TABBAR_FOCUSED:-0}"
@@ -91,11 +93,11 @@ shellframe_tabbar_render() {
         fi
 
         # Active tab: bold, default background (clear).
-        # Inactive tabs: reverse video (white background), normal weight.
+        # Inactive tabs: _bg (reverse video by default, overridable via SHELLFRAME_TABBAR_BG).
         if (( _i == _active )); then
             printf '%s%s%s' "$_bold" "$_tab" "$_rst" >/dev/tty
         else
-            printf '%s%s%s' "$_rev" "$_tab" "$_rst" >/dev/tty
+            printf '%s%s%s' "$_bg" "$_tab" "$_rst" >/dev/tty
         fi
 
         (( _remaining -= _tlen ))
@@ -107,9 +109,9 @@ shellframe_tabbar_render() {
         fi
     done
 
-    # Fill remaining space with reverse video to complete the solid bar.
+    # Fill remaining space with _bg to complete the solid bar.
     if (( _remaining > 0 )); then
-        printf '%s' "$_rev" >/dev/tty
+        printf '%s' "$_bg" >/dev/tty
         local _k=0
         while (( _k < _remaining )); do
             printf ' ' >/dev/tty
