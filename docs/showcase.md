@@ -18,7 +18,7 @@ Ask a yes/no question with optional detail lines summarising what will happen.
 |                                            |
 |       Deploy to production?                |
 |                                            |
-|           [ Yes ]      [ No  ]            |
+|           [ Yes ]      [ No  ]             |
 |                                            |
 +--------------------------------------------+
        ←/→ select   y/n quick   Enter confirm
@@ -105,7 +105,7 @@ SHELLFRAME_AL_IDX=(0 0 0 0 0)
 SHELLFRAME_AL_META=("" "" "" "" "")
 
 _draw_row() {
-    local i="$1" label="$2" acts_str="$3" aidx="$4"
+    local i="$1" label="$2" acts_str="$3" aidx="$4" meta="$5"
     local cursor="  "
     (( i == SHELLFRAME_AL_SELECTED )) && cursor="> "
     local -a acts; IFS=' ' read -r -a acts <<< "$acts_str"
@@ -153,7 +153,7 @@ source shellframe.sh
 
 SHELLFRAME_LIST_ITEMS=("bash-completion" "curl" "git" "jq" "ripgrep" "tmux")
 SHELLFRAME_LIST_CTX="pkgs"
-shellframe_list_init "pkgs" 10
+shellframe_list_init "pkgs" 10   # ctx, visible-row count
 
 shellframe_screen_enter
 shellframe_raw_enter
@@ -169,7 +169,7 @@ while true; do
     [[ "$key" == q ]] && { rc=1; break; }
 done
 
-if (( rc == 0 )); then
+if (( rc == 2 )); then
     idx=$(shellframe_sel_cursor "pkgs")
     printf "Selected: %s\n" "${SHELLFRAME_LIST_ITEMS[$idx]}"
 fi
@@ -204,7 +204,7 @@ source shellframe.sh
 SHELLFRAME_LIST_ITEMS=("bash-completion" "curl" "git" "jq" "ripgrep" "tmux")
 SHELLFRAME_LIST_CTX="pkgs"
 SHELLFRAME_LIST_MULTISELECT=1
-shellframe_list_init "pkgs" 10
+shellframe_list_init "pkgs" 10   # ctx, visible-row count
 
 # ... same render loop as single-select above ...
 
@@ -309,10 +309,10 @@ while true; do
     [[ "$key" == $'\003' ]] && { rc=1; break; }   # Ctrl-C
 done
 
-(( rc == 0 )) && printf "Text:\n%s\n" "$(shellframe_editor_text "notes")"
+(( rc == 0 )) && printf "Text:\n%s\n" "$(shellframe_editor_get_text "notes")"
 ```
 
-**Returns:** full text via `shellframe_editor_text "ctx"`.
+**Returns:** full text via `shellframe_editor_get_text "ctx"`.
 
 ---
 
@@ -328,7 +328,7 @@ Screen 1 — confirm                Screen 2 — alert (after Yes)
 |                                  |  |                                  |
 |    Flush the Redis cache?        |  |       Cache flushed.             |
 |                                  |  |                                  |
-|       [ Yes ]      [ No  ]      |  |        [ OK — any key ]         |
+|       [ Yes ]      [ No  ]       |  |        [ OK — any key ]          |
 |                                  |  |                                  |
 +----------------------------------+  +----------------------------------+
 ```
