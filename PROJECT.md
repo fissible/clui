@@ -203,4 +203,5 @@ _Last updated: 2026-03-16 (session 5)_
   - Tab bar: inactive=reverse video (persistent white bar), active=bold+clear bg, fill=reverse video.
   - Table screen: gap row below tab bar; ↓ from tab bar focuses body; ↑ at top of body returns focus to tab bar; `[`/`]` switch tabs from anywhere.
   - All shellframe widget changes committed in shellframe repo.
+- **showcase.md corrections (2026-03-16)**: Fixed two bugs — `if (( rc == 0 ))` → `if (( rc == 2 ))` in list example (Enter returns 2), `shellframe_editor_text` → `shellframe_editor_get_text`. Added `meta="$5"` to action-list `_draw_row` signature; inline comment on `shellframe_list_init` second arg.
 - **Next task: Phase 5.5 — Record inspector** ([shellql#5](https://github.com/fissible/shellql/issues/5)): modal or side panel, key/value layout from selected grid row, scroll for long values. `_shql_TABLE_body_action` hook already in place (Enter on data row triggers it).
