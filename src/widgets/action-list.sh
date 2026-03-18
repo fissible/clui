@@ -51,6 +51,9 @@ shellframe_action_list() {
     local _extra_key_fn="${2:-}"
     local _footer="${3:-↑/↓ move  Space/→ cycle  Enter confirm  q quit}"
     local _n=${#SHELLFRAME_AL_LABELS[@]}
+    local _dirty=2       # 2=full  1=partial(cursor rows only)  0=none
+    local _prev_sel=0    # cursor position before this key event
+    local _prev_rows=0 _prev_cols=0   # for resize detection
 
     # ── Route TUI output to the real terminal ─────────────────────────────
     # When called via $(), stdout is a pipe.  Redirect to /dev/tty so all
@@ -93,20 +96,54 @@ shellframe_action_list() {
 
     # ── Draw ──────────────────────────────────────────────────────────────
     _al_draw() {
-        shellframe_screen_clear
-        local _dai
-        for (( _dai=0; _dai<_n; _dai++ )); do
-            local _dlabel="${SHELLFRAME_AL_LABELS[$_dai]}"
-            local _dacts_str="${SHELLFRAME_AL_ACTIONS[$_dai]}"
-            local _daidx="${SHELLFRAME_AL_IDX[$_dai]}"
-            local _dmeta="${SHELLFRAME_AL_META[$_dai]:-}"
-            if [[ -n "$_draw_row_fn" ]]; then
-                "$_draw_row_fn" "$_dai" "$_dlabel" "$_dacts_str" "$_daidx" "$_dmeta"
-            else
-                _al_default_draw_row "$_dai" "$_dlabel" "$_dacts_str" "$_daidx" "$_dmeta"
-            fi
-        done
-        printf "\n  ${SHELLFRAME_GRAY}%s${SHELLFRAME_RESET}\n" "$_footer"
+        # Resize detection: if terminal size changed, escalate to full redraw
+        local _cur_rows=24 _cur_cols=80
+        { read -r _cur_rows _cur_cols; } < <(stty size </dev/tty 2>/dev/null) || true
+        if (( _cur_rows != _prev_rows || _cur_cols != _prev_cols )); then
+            _dirty=2
+            _prev_rows=$_cur_rows
+            _prev_cols=$_cur_cols
+        fi
+
+        if (( _dirty == 0 )); then return; fi
+
+        if (( _dirty == 2 )); then
+            # ── Full redraw ───────────────────────────────────────────────
+            shellframe_screen_clear
+            local _dai
+            for (( _dai=0; _dai<_n; _dai++ )); do
+                local _dlabel="${SHELLFRAME_AL_LABELS[$_dai]}"
+                local _dacts_str="${SHELLFRAME_AL_ACTIONS[$_dai]}"
+                local _daidx="${SHELLFRAME_AL_IDX[$_dai]}"
+                local _dmeta="${SHELLFRAME_AL_META[$_dai]:-}"
+                if [[ -n "$_draw_row_fn" ]]; then
+                    "$_draw_row_fn" "$_dai" "$_dlabel" "$_dacts_str" "$_daidx" "$_dmeta"
+                else
+                    _al_default_draw_row "$_dai" "$_dlabel" "$_dacts_str" "$_daidx" "$_dmeta"
+                fi
+            done
+            printf "\n  ${SHELLFRAME_GRAY}%s${SHELLFRAME_RESET}\n" "$_footer"
+        else
+            # ── Partial redraw (_dirty=1): overwrite old and new cursor rows ──
+            # Terminal row = item index + 1 (items start at row 1, no scroll offset).
+            # For action cycle (Right/Space), _prev_sel == SHELLFRAME_AL_SELECTED;
+            # the loop still works — it redraws the same row twice (idempotent).
+            local _dr
+            for _dr in "$_prev_sel" "$SHELLFRAME_AL_SELECTED"; do
+                printf '\033[%d;1H\033[2K' "$(( _dr + 1 ))"
+                local _dlabel="${SHELLFRAME_AL_LABELS[$_dr]}"
+                local _dacts_str="${SHELLFRAME_AL_ACTIONS[$_dr]}"
+                local _daidx="${SHELLFRAME_AL_IDX[$_dr]}"
+                local _dmeta="${SHELLFRAME_AL_META[$_dr]:-}"
+                if [[ -n "$_draw_row_fn" ]]; then
+                    "$_draw_row_fn" "$_dr" "$_dlabel" "$_dacts_str" "$_daidx" "$_dmeta"
+                else
+                    _al_default_draw_row "$_dr" "$_dlabel" "$_dacts_str" "$_daidx" "$_dmeta"
+                fi
+            done
+        fi
+
+        _dirty=0
     }
     _al_draw
 
@@ -114,16 +151,20 @@ shellframe_action_list() {
     local _al_retval=1
     while true; do
         local _key
+        _prev_sel=$SHELLFRAME_AL_SELECTED   # snapshot before key handling
         shellframe_read_key _key
 
         if   [[ "$_key" == "$SHELLFRAME_KEY_UP" ]]; then
             (( SHELLFRAME_AL_SELECTED > 0 )) && (( SHELLFRAME_AL_SELECTED-- )) || true
+            _dirty=1
         elif [[ "$_key" == "$SHELLFRAME_KEY_DOWN" ]]; then
             (( SHELLFRAME_AL_SELECTED < _n - 1 )) && (( SHELLFRAME_AL_SELECTED++ )) || true
+            _dirty=1
         elif [[ "$_key" == "$SHELLFRAME_KEY_RIGHT" || "$_key" == "$SHELLFRAME_KEY_SPACE" ]]; then
             local -a _cur_acts
             IFS=' ' read -r -a _cur_acts <<< "${SHELLFRAME_AL_ACTIONS[$SHELLFRAME_AL_SELECTED]}"
             SHELLFRAME_AL_IDX[$SHELLFRAME_AL_SELECTED]=$(( (SHELLFRAME_AL_IDX[$SHELLFRAME_AL_SELECTED] + 1) % ${#_cur_acts[@]} ))
+            _dirty=1
         elif [[ "$_key" == "$SHELLFRAME_KEY_ENTER" || "$_key" == 'c' || "$_key" == 'C' ]]; then
             _al_retval=0
             break
@@ -138,7 +179,8 @@ shellframe_action_list() {
             elif (( _xrc == 1 )); then
                 continue   # not handled — skip redraw
             fi
-            # _xrc == 0: handled — fall through to redraw
+            _dirty=2   # _xrc == 0: handled — conservative full redraw (caller may have
+                       # re-entered via shellframe_screen_enter after a sub-TUI)
         else
             continue  # unrecognized key — skip redraw
         fi
