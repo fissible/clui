@@ -34,7 +34,7 @@ shellframe_screen_exit() {
 #
 # ROADMAP — two-stage migration to diff rendering (Phase 7, shellframe):
 #
-#   Stage 1 — Dirty-region tracking (Phase 7 task B, GH #TBD):
+#   Stage 1 — Dirty-region tracking (Phase 7 task B, GH #23):
 #     Each widget gains a dirty flag. The app render loop skips
 #     shellframe_screen_clear and only calls render on dirty widgets.
 #     Render functions still write directly to /dev/tty. No API break.
