@@ -80,8 +80,8 @@ Start every new session by reading this file. Update task status here when work 
 | 19 | Welcome screen (recent files list, open action, empty state) | M | [shellql#1](https://github.com/fissible/shellql/issues/1) | closed | 11,18 |
 | 20 | Schema browser (sidebar tree + main pane detail)            | M | [shellql#2](https://github.com/fissible/shellql/issues/2) | closed | 15,18 |
 | 21 | Table view (tab bar, data grid, structure tab)              | L | [shellql#3](https://github.com/fissible/shellql/issues/3) | closed | 13,17,18 |
-| 22 | Query screen (editor + results grid + status area)          | M | [shellql#4](https://github.com/fissible/shellql/issues/4) | open | 16,17,18 |
-| 23 | Record inspector (modal key/value scroll panel)             | S | [shellql#5](https://github.com/fissible/shellql/issues/5) | open | 14,18 |
+| 22 | Query screen (editor + results grid + status area)          | M | [shellql#4](https://github.com/fissible/shellql/issues/4) | closed | 16,17,18 |
+| 23 | Record inspector (modal key/value scroll panel)             | S | [shellql#5](https://github.com/fissible/shellql/issues/5) | closed | 14,18 |
 
 ---
 
@@ -130,7 +130,7 @@ Start every new session by reading this file. Update task status here when work 
 | Milestone | Condition | Status |
 |-----------|-----------|--------|
 | **M1: Shellframe ready** | Phase 1–4 all closed | open |
-| **M2: Mock app complete** | Phase 5 all closed, mock screens working | in progress (3/5 screens done) |
+| **M2: Mock app complete** | Phase 5 all closed, mock screens working | closed (5/5 screens done) |
 | **M3: ShellQL v0.1** | Phase 6 all closed, integration tests passing | open |
 | **M4: Platform enhancements** | Phase 7 all closed; mouse, diff rendering, full F-key support | open |
 
@@ -222,4 +222,8 @@ _Last updated: 2026-03-16 (session 5)_
   - Confirm/alert/action-list have integration tests but no unit tests; recommended path is refactor to expose v2 internals (`_render` + `_on_key`) and keep monolithic wrappers — unit-testable state machine, backwards-compatible callers, aligns with LEGO philosophy
   - 674/674 assertions pass
 - **Phase 3.5 #22 Menu bar backlogged (2026-03-17)**: [shellframe#22](https://github.com/fissible/shellframe/issues/22) — horizontal menu bar + dropdown + submenu. Deps: panel.sh, clip.sh, selection.sh, input/keymap (all shipped). Bash 3.2 label→variable naming convention (`SHELLFRAME_MENU_FILE=(...)`). Result path in `SHELLFRAME_MENU_RESULT` (e.g. `"File|Open Recent|file1.db"`). Effort L. Deliverables: `src/widgets/menu-bar.sh`, unit tests, example, integration tests, showcase entry.
-- **Next task: Phase 5.5 — Record inspector** ([shellql#5](https://github.com/fissible/shellql/issues/5)): modal or side panel, key/value layout from selected grid row, scroll for long values. `_shql_TABLE_body_action` hook already in place (Enter on data row triggers it).
+- **Phase 5.5 Record inspector closed (shellql#5)**: `src/screens/inspector.sh` — two-column key/value overlay, `ceil(N/2)` scroll model; Enter on data row triggers it via `_shql_TABLE_body_action`.
+- **Phase 5.4 Query screen closed (shellql#4)** (2026-03-17): `src/screens/query.sh` — editor 30% / `─` divider / results grid split; Ctrl-D runs query, auto-focuses results; Tab: editor→results→stop; Shift-Tab: results→editor→tabbar→stop; auto-focuses editor on Query tab entry. 19 unit assertions.
+- **shellframe change (2026-03-17)**: `src/shell.sh` — Tab/Shift-Tab now offered to focused region's `on_key` before cycling focus; returning 0 consumes the key and suppresses the default advance/retreat. Backward-compatible: existing handlers that return 1 continue to get default behaviour.
+- **M2 milestone achieved**: All Phase 5 mock screens complete (shellql#1–5 all closed).
+- **Next task: Phase 6 — SQLite integration** (shellql#6–8): mock adapter cleanup, `src/db.sh` real adapter, CLI argument parsing (`bin/shql`).

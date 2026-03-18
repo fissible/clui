@@ -25,6 +25,8 @@
 #   PREFIX_SCREEN_<region>_on_key key            (optional)
 #     Key handler for the region.  Returns 0/1/2 per component contract.
 #     If absent, the region is not focusable (same as passing "nofocus").
+#     Tab/Shift-Tab are offered to on_key before focus cycling: returning 0
+#     consumes the key and suppresses the default focus advance/retreat.
 #
 #   PREFIX_SCREEN_<region>_on_focus focused       (optional)
 #     Called when the region gains (1) or loses (0) focus.
