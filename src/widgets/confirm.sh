@@ -91,6 +91,7 @@ shellframe_confirm() {
     # ── row renderer ─────────────────────────────────────────────────────────
 
     # Render the button row at absolute terminal row $1.
+    # Reads from enclosing scope: _selected, _inner, _c0
     _cf_draw_buttons() {
         local _brow="$1"
         local _yes_str _no_str
