@@ -343,8 +343,8 @@ shellframe_shell() {
     while [[ "$_current" != "__QUIT__" ]]; do
 
         # Enter new screen: reset focus ring index to 0, full draw
+        # Preserve any pending focus request (e.g. set before shell launch)
         _SHELLFRAME_SHELL_FOCUS_IDX=0
-        _SHELLFRAME_SHELL_FOCUS_REQUEST=""
         _shellframe_shell_draw "$_prefix" "$_current"
 
         # Input loop for this screen
