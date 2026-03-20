@@ -37,24 +37,24 @@ _demo_fill_pane() {
     local _r
     for (( _r=0; _r < _h; _r++ )); do
         local _row=$(( _top + _r ))
-        printf '\033[%d;%dH' "$_row" "$_left" >/dev/tty
+        printf '\033[%d;%dH' "$_row" "$_left" >&3
         if (( _row == _mid_row )); then
             # Center the label
             local _pad=$(( (_w - ${#_label}) / 2 ))
             (( _pad < 0 )) && _pad=0
             local _c
             for (( _c=0; _c < _pad; _c++ )); do
-                printf '%s·%s' "$_color" "$_reset" >/dev/tty
+                printf '%s·%s' "$_color" "$_reset" >&3
             done
-            printf '%s%s%s' "$_bg" "$_label" "$_reset" >/dev/tty
+            printf '%s%s%s' "$_bg" "$_label" "$_reset" >&3
             local _remaining=$(( _w - _pad - ${#_label} ))
             for (( _c=0; _c < _remaining; _c++ )); do
-                printf '%s·%s' "$_color" "$_reset" >/dev/tty
+                printf '%s·%s' "$_color" "$_reset" >&3
             done
         else
             local _c
             for (( _c=0; _c < _w; _c++ )); do
-                printf '%s·%s' "$_color" "$_reset" >/dev/tty
+                printf '%s·%s' "$_color" "$_reset" >&3
             done
         fi
     done
@@ -103,7 +103,7 @@ _demo_ROOT_render() {
 
 _demo_ROOT_header_render() {
     local _top="$1" _left="$2" _w="$3"
-    printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$_top" "$_left" >&3
 
     local _title
     case "$_DEMO_LAYOUT" in
@@ -112,24 +112,24 @@ _demo_ROOT_header_render() {
         3) _title="Layout 3: 2-pane horizontal (50/50)" ;;
     esac
 
-    printf '%s%s%s' "${SHELLFRAME_REVERSE:-}" "$_title" "${SHELLFRAME_RESET:-}" >/dev/tty
+    printf '%s%s%s' "${SHELLFRAME_REVERSE:-}" "$_title" "${SHELLFRAME_RESET:-}" >&3
     # Pad rest of header
     local _pad=$(( _w - ${#_title} ))
     local _i
     for (( _i=0; _i < _pad; _i++ )); do
-        printf '%s %s' "${SHELLFRAME_REVERSE:-}" "${SHELLFRAME_RESET:-}" >/dev/tty
+        printf '%s %s' "${SHELLFRAME_REVERSE:-}" "${SHELLFRAME_RESET:-}" >&3
     done
 }
 
 _demo_ROOT_footer_render() {
     local _top="$1" _left="$2" _w="$3"
-    printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$_top" "$_left" >&3
     local _msg="Tab: focus  1/2/3: layout  q: quit"
-    printf '%s%s%s' "${SHELLFRAME_GRAY:-}" "$_msg" "${SHELLFRAME_RESET:-}" >/dev/tty
+    printf '%s%s%s' "${SHELLFRAME_GRAY:-}" "$_msg" "${SHELLFRAME_RESET:-}" >&3
     local _pad=$(( _w - ${#_msg} ))
     local _i
     for (( _i=0; _i < _pad; _i++ )); do
-        printf ' ' >/dev/tty
+        printf ' ' >&3
     done
 }
 

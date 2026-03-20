@@ -294,7 +294,7 @@ shellframe_tree_render() {
         local _row=$(( _top + _r ))
         local _vi=$(( _scroll_top + _r ))
 
-        printf '\033[%d;%dH%*s' "$_row" "$_left" "$_width" '' >/dev/tty
+        printf '\033[%d;%dH%*s' "$_row" "$_left" "$_width" '' >&3
 
         [[ $_vi -ge $_vcount ]] && continue
 
@@ -325,24 +325,24 @@ shellframe_tree_render() {
         local _clipped
         _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_width")
 
-        printf '\033[%d;%dH' "$_row" "$_left" >/dev/tty
+        printf '\033[%d;%dH' "$_row" "$_left" >&3
 
         if (( _vi == _vcursor )); then
-            printf '%s' "$_rev" >/dev/tty
-            printf '%s' "$_clipped" >/dev/tty
+            printf '%s' "$_rev" >&3
+            printf '%s' "$_clipped" >&3
             local _clen=${#_clipped}
             local _k=0
             while (( _k < _width - _clen )); do
-                printf ' ' >/dev/tty
+                printf ' ' >&3
                 (( _k++ ))
             done
-            printf '%s' "$_rst" >/dev/tty
+            printf '%s' "$_rst" >&3
         else
-            printf '%s' "$_clipped" >/dev/tty
+            printf '%s' "$_clipped" >&3
         fi
     done
 
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_tree_on_key ────────────────────────────────────────────────────

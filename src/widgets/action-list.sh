@@ -60,7 +60,7 @@ shellframe_action_list() {
     # screen output reaches the terminal.  Fixed fd 3 — {varname} requires
     # bash 4.1+; macOS ships bash 3.2.
     exec 3>&1
-    exec 1>/dev/tty
+    exec 1>&3
 
     # ── Cleanup ───────────────────────────────────────────────────────────
     SHELLFRAME_AL_SAVED_STTY=$(shellframe_raw_save)

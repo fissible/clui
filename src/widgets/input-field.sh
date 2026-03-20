@@ -80,14 +80,14 @@ shellframe_field_render() {
     shellframe_cur_pos  "$_ctx" _pos
 
     # Clear the row
-    printf '\033[%d;%dH\033[2K' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH\033[2K' "$_top" "$_left" >&3
 
     # Empty + unfocused: show placeholder
     if [[ -z "$_text" && $(( _focused )) -eq 0 && -n "$_placeholder" ]]; then
         local _ph
         _ph=$(shellframe_str_clip_ellipsis "$_placeholder" "$_placeholder" "$_width")
-        printf '\033[%d;%dH\033[2m%s\033[0m' "$_top" "$_left" "$_ph" >/dev/tty
-        printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
+        printf '\033[%d;%dH\033[2m%s\033[0m' "$_top" "$_left" "$_ph" >&3
+        printf '\033[%d;%dH' "$_top" "$_left" >&3
         return 0
     fi
 
@@ -110,21 +110,21 @@ shellframe_field_render() {
     local _vlen=${#_vis}
     local _cur_vis=$(( _pos - _scroll ))
 
-    printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$_top" "$_left" >&3
 
     if (( _focused )); then
         local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
         local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
 
         # Text before cursor
-        printf '%s' "${_vis:0:$_cur_vis}" >/dev/tty
+        printf '%s' "${_vis:0:$_cur_vis}" >&3
 
         # Cursor: highlight char at cursor pos, or a space if at end of text
         if (( _cur_vis < _vlen )); then
-            printf '%s%s%s' "$_rev" "${_vis:$_cur_vis:1}" "$_rst" >/dev/tty
-            printf '%s' "${_vis:$(( _cur_vis + 1 ))}" >/dev/tty
+            printf '%s%s%s' "$_rev" "${_vis:$_cur_vis:1}" "$_rst" >&3
+            printf '%s' "${_vis:$(( _cur_vis + 1 ))}" >&3
         else
-            printf '%s %s' "$_rev" "$_rst" >/dev/tty
+            printf '%s %s' "$_rev" "$_rst" >&3
         fi
 
         # Pad remaining columns
@@ -132,21 +132,21 @@ shellframe_field_render() {
         (( _cur_vis >= _vlen )) && (( _drawn++ )) || true
         local _k=0
         while (( _k < _width - _drawn )); do
-            printf ' ' >/dev/tty
+            printf ' ' >&3
             (( _k++ ))
         done
     else
-        printf '%s' "$_vis" >/dev/tty
+        printf '%s' "$_vis" >&3
         # Pad remaining columns
         local _k=0
         while (( _k < _width - _vlen )); do
-            printf ' ' >/dev/tty
+            printf ' ' >&3
             (( _k++ ))
         done
     fi
 
     # Leave cursor at start of row (component contract)
-    printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$_top" "$_left" >&3
 }
 
 # ── shellframe_field_on_key ───────────────────────────────────────────────────

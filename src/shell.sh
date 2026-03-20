@@ -68,7 +68,7 @@
 #       shellframe_shell_region main 2 1 "$_cols" $(( _rows - 2 )) focus
 #       shellframe_shell_region footer "$_rows" 1 "$_cols" 1 nofocus
 #   }
-#   _myapp_ROOT_topbar_render() { printf '\033[%d;%dHMy App' "$1" "$2" >/dev/tty; }
+#   _myapp_ROOT_topbar_render() { printf '\033[%d;%dHMy App' "$1" "$2" >&3; }
 #   _myapp_ROOT_main_render()   { SHELLFRAME_LIST_CTX="main"; shellframe_list_render "$@"; }
 #   _myapp_ROOT_main_on_key()   { SHELLFRAME_LIST_CTX="main"; shellframe_list_on_key "$1"; }
 #   _myapp_ROOT_main_on_focus() { shellframe_list_on_focus "$1"; }
@@ -344,6 +344,40 @@ shellframe_shell() {
             local _key=""
             _shellframe_shell_read_key _key
             [[ -z "$_key" ]] && continue   # timeout or resize — loop back
+
+            # Coalesce repeated keys: drain buffered duplicates of the same
+            # key to avoid one-redraw-per-repeat when holding an arrow key.
+            # Store the repeat count in _SHELLFRAME_SHELL_KEY_COUNT.
+            _SHELLFRAME_SHELL_KEY_COUNT=1
+            if [[ "$_key" == "$SHELLFRAME_KEY_UP" || "$_key" == "$SHELLFRAME_KEY_DOWN" \
+               || "$_key" == "$SHELLFRAME_KEY_LEFT" || "$_key" == "$SHELLFRAME_KEY_RIGHT" \
+               || "$_key" == "$SHELLFRAME_KEY_PAGE_UP" || "$_key" == "$SHELLFRAME_KEY_PAGE_DOWN" ]]; then
+                local _peek=""
+                while true; do
+                    _peek=""
+                    IFS= read -r -n1 -d '' -t 0 _peek 2>/dev/null || break
+                    [[ -z "$_peek" ]] && break
+                    # If it starts an escape, read the rest
+                    if [[ "$_peek" == $'\x1b' ]]; then
+                        local _rest=""
+                        IFS= read -r -n1 -d '' -t 0 _rest 2>/dev/null || true
+                        _peek+="$_rest"
+                        if [[ "$_rest" == '[' || "$_rest" == 'O' ]]; then
+                            local _fc=""
+                            while true; do
+                                IFS= read -r -n1 -d '' -t 0 _fc 2>/dev/null || break
+                                _peek+="$_fc"
+                                case "$_fc" in [A-Za-z~]) break ;; esac
+                            done
+                        fi
+                    fi
+                    if [[ "$_peek" == "$_key" ]]; then
+                        (( _SHELLFRAME_SHELL_KEY_COUNT++ ))
+                    else
+                        break  # different key — stop coalescing (key is lost, acceptable)
+                    fi
+                done
+            fi
 
             # Check for resize after read returns
             if (( _SHELLFRAME_SHELL_RESIZED )); then

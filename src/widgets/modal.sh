@@ -97,7 +97,7 @@ _shellframe_modal_render_buttons() {
     local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
 
     # Clear the row
-    printf '\033[%d;%dH\033[2K' "$_row" "$_left" >/dev/tty
+    printf '\033[%d;%dH\033[2K' "$_row" "$_left" >&3
 
     (( _n_btns == 0 )) && return
 
@@ -117,15 +117,15 @@ _shellframe_modal_render_buttons() {
     local _pad=$(( (_inner_w - _total_w) / 2 ))
     (( _pad < 0 )) && _pad=0
 
-    printf '\033[%d;%dH' "$_row" "$(( _left + _pad ))" >/dev/tty
+    printf '\033[%d;%dH' "$_row" "$(( _left + _pad ))" >&3
 
     local _i
     for (( _i=0; _i<_n_btns; _i++ )); do
-        (( _i > 0 )) && printf ' ' >/dev/tty
+        (( _i > 0 )) && printf ' ' >&3
         if (( _i == _active )); then
-            printf '%s%s%s' "$_rev" "${_btn_strs[$_i]}" "$_rst" >/dev/tty
+            printf '%s%s%s' "$_rev" "${_btn_strs[$_i]}" "$_rst" >&3
         else
-            printf '%s' "${_btn_strs[$_i]}" >/dev/tty
+            printf '%s' "${_btn_strs[$_i]}" >&3
         fi
     done
 }
@@ -232,7 +232,7 @@ shellframe_modal_render() {
     # Clear inner area
     local _ir
     for (( _ir=0; _ir<_inner_h; _ir++ )); do
-        printf '\033[%d;%dH\033[2K' "$(( _inner_top + _ir ))" "$_inner_left" >/dev/tty
+        printf '\033[%d;%dH\033[2K' "$(( _inner_top + _ir ))" "$_inner_left" >&3
     done
 
     # ── Render message body (rows 1..n, with 2-char side margins) ──
@@ -248,7 +248,7 @@ shellframe_modal_render() {
             if (( _msg_row < _inner_top + _inner_h - 1 )); then
                 local _clipped
                 _clipped=$(shellframe_str_clip_ellipsis "$_line" "$_line" "$_msg_avail")
-                printf '\033[%d;%dH%s' "$_msg_row" "$_msg_col" "$_clipped" >/dev/tty
+                printf '\033[%d;%dH%s' "$_msg_row" "$_msg_col" "$_clipped" >&3
             fi
             (( _msg_row++ ))
         done < <(printf '%s\n' "$_msg")
@@ -279,7 +279,7 @@ shellframe_modal_render() {
     fi
 
     # Leave cursor at bottom-left of modal per component contract
-    printf '\033[%d;%dH' "$(( _modal_top + _modal_h - 1 ))" "$_modal_left" >/dev/tty
+    printf '\033[%d;%dH' "$(( _modal_top + _modal_h - 1 ))" "$_modal_left" >&3
 }
 
 # ── shellframe_modal_on_key ───────────────────────────────────────────────────

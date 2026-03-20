@@ -237,7 +237,7 @@ shellframe_grid_render() {
 
     # ── Header label row ──────────────────────────────────────────────────────
     if (( _has_header )); then
-        printf '\033[%d;%dH\033[2K' "$_top" "$_left" >/dev/tty
+        printf '\033[%d;%dH\033[2K' "$_top" "$_left" >&3
 
         local _vi
         for (( _vi=0; _vi<_n_vis_cols; _vi++ )); do
@@ -253,39 +253,39 @@ shellframe_grid_render() {
             local _clipped
             _clipped=$(shellframe_str_clip_ellipsis "$_hdr" \
                 "${_bold}${_white}${_hdr}${_rst}" "$_avail")
-            printf '\033[%d;%dH%s' "$_top" "$(( _left + _pad_xoff ))" "$_clipped" >/dev/tty
+            printf '\033[%d;%dH%s' "$_top" "$(( _left + _pad_xoff ))" "$_clipped" >&3
 
             # Separator after this header
             if (( _vi < _n_vis_seps )); then
                 printf '\033[%d;%dH%s%s%s' \
                     "$_top" "$(( _left + ${_vis_sep_x[$_vi]} ))" \
-                    "$_gray" "${_vis_sep_char[$_vi]}" "$_rst" >/dev/tty
+                    "$_gray" "${_vis_sep_char[$_vi]}" "$_rst" >&3
             fi
         done
 
         # Right end-of-data border in header label row
         if (( _right_border_x >= 0 )); then
             printf '\033[%d;%dH%s│%s' \
-                "$_top" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >/dev/tty
+                "$_top" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >&3
         fi
 
         # ── Header separator row: ─── with ┼/╋ at column separator positions ──
-        printf '\033[%d;%dH%s' "$(( _top + 1 ))" "$_left" "$_gray" >/dev/tty
+        printf '\033[%d;%dH%s' "$(( _top + 1 ))" "$_left" "$_gray" >&3
         local _prev_x=0 _bvi
         for (( _bvi=0; _bvi<_n_vis_seps; _bvi++ )); do
             local _sep_x="${_vis_sep_x[$_bvi]}"
             # Dashes from _prev_x up to (but not including) the separator pixel
             local _bdi
-            for (( _bdi=_prev_x; _bdi<_sep_x; _bdi++ )); do printf '─' >/dev/tty; done
-            printf '%s' "${_vis_sep_junc[$_bvi]}" >/dev/tty
+            for (( _bdi=_prev_x; _bdi<_sep_x; _bdi++ )); do printf '─' >&3; done
+            printf '%s' "${_vis_sep_junc[$_bvi]}" >&3
             _prev_x=$(( _sep_x + 1 ))
         done
         # Remaining dashes to the right edge (or to the right border position)
         local _dash_end=$(( _right_border_x >= 0 ? _right_border_x : _width ))
         local _bdi
-        for (( _bdi=_prev_x; _bdi<_dash_end; _bdi++ )); do printf '─' >/dev/tty; done
-        if (( _right_border_x >= 0 )); then printf '┘' >/dev/tty; fi
-        printf '%s' "$_rst" >/dev/tty
+        for (( _bdi=_prev_x; _bdi<_dash_end; _bdi++ )); do printf '─' >&3; done
+        if (( _right_border_x >= 0 )); then printf '┘' >&3; fi
+        printf '%s' "$_rst" >&3
     fi
 
     # ── Data rows ─────────────────────────────────────────────────────────────
@@ -301,7 +301,7 @@ shellframe_grid_render() {
         local _row=$(( _data_top + _r ))
         local _ridx=$(( _vscroll_top + _r ))
 
-        printf '\033[%d;%dH\033[2K' "$_row" "$_left" >/dev/tty
+        printf '\033[%d;%dH\033[2K' "$_row" "$_left" >&3
         [[ "$_ridx" -ge "$_nrows" ]] && continue
 
         local _is_cursor=0
@@ -320,7 +320,7 @@ shellframe_grid_render() {
         # Activate reverse video for the entire cursor row before writing any cell.
         # The attribute persists through absolute cursor moves, so all subsequent
         # cells and separators will be rendered in reverse video.
-        (( _is_cursor )) && printf '\033[%d;%dH%s' "$_row" "$_left" "$_rev" >/dev/tty
+        (( _is_cursor )) && printf '\033[%d;%dH%s' "$_row" "$_left" "$_rev" >&3
 
         local _vi
         for (( _vi=0; _vi<_n_vis_cols; _vi++ )); do
@@ -345,7 +345,7 @@ shellframe_grid_render() {
             _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_avail")
             local _padded
             _padded=$(shellframe_str_pad "$_text" "$_clipped" "$_avail")
-            printf '\033[%d;%dH%s' "$_row" "$(( _left + _pad_xoff ))" "$_padded" >/dev/tty
+            printf '\033[%d;%dH%s' "$_row" "$(( _left + _pad_xoff ))" "$_padded" >&3
 
             # Separator after this column.
             # Cursor row: separator inherits the active reverse-video attribute.
@@ -355,26 +355,26 @@ shellframe_grid_render() {
                 local _schar="${_vis_sep_char[$_vi]}"
                 if (( _is_cursor )); then
                     printf '\033[%d;%dH%s' \
-                        "$_row" "$(( _left + _sxoff ))" "$_schar" >/dev/tty
+                        "$_row" "$(( _left + _sxoff ))" "$_schar" >&3
                 else
                     printf '\033[%d;%dH%s%s%s' \
                         "$_row" "$(( _left + _sxoff ))" \
-                        "$_gray" "$_schar" "$_rst" >/dev/tty
+                        "$_gray" "$_schar" "$_rst" >&3
                 fi
             fi
         done
 
-        (( _is_cursor )) && printf '%s' "$_rst" >/dev/tty
+        (( _is_cursor )) && printf '%s' "$_rst" >&3
 
         # Right end-of-data border in data row (only for rows that have data)
         if (( _right_border_x >= 0 && _ridx < _nrows )); then
             printf '\033[%d;%dH%s│%s' \
-                "$_row" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >/dev/tty
+                "$_row" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >&3
         fi
     done
 
     # Leave cursor at last row, column left (component contract)
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_grid_on_key ─────────────────────────────────────────────────────

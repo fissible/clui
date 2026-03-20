@@ -91,14 +91,14 @@ _shellframe_panel_hline() {
     # Inner fill space = width - 2  (one col for each corner character)
     local _inner=$(( _width - 2 ))
 
-    printf '\033[%d;%dH' "$_row" "$_col" >/dev/tty
-    printf '%s' "$_lc" >/dev/tty
+    printf '\033[%d;%dH' "$_row" "$_col" >&3
+    printf '%s' "$_lc" >&3
 
     if [[ -z "$_title" || $_inner -le 2 ]]; then
         # No title or no room: plain fill
         local _k=0
         while (( _k < _inner )); do
-            printf '%s' "$_fc" >/dev/tty
+            printf '%s' "$_fc" >&3
             (( _k++ ))
         done
     else
@@ -125,13 +125,13 @@ _shellframe_panel_hline() {
         esac
 
         local _k=0
-        while (( _k < _lf )); do printf '%s' "$_fc" >/dev/tty; (( _k++ )); done
-        printf '%s' "$_ts" >/dev/tty
+        while (( _k < _lf )); do printf '%s' "$_fc" >&3; (( _k++ )); done
+        printf '%s' "$_ts" >&3
         _k=0
-        while (( _k < _rf )); do printf '%s' "$_fc" >/dev/tty; (( _k++ )); done
+        while (( _k < _rf )); do printf '%s' "$_fc" >&3; (( _k++ )); done
     fi
 
-    printf '%s' "$_rc" >/dev/tty
+    printf '%s' "$_rc" >&3
 }
 
 # ── shellframe_panel_render ────────────────────────────────────────────────────
@@ -154,23 +154,23 @@ shellframe_panel_render() {
     fi
 
     # Top border (with optional title)
-    printf '%s' "$_on" >/dev/tty
+    printf '%s' "$_on" >&3
     _shellframe_panel_hline "$_top" "$_left" "$_width" "$_tl" "$_hr" "$_tr" "$_title" "$_talign"
 
     # Side borders
     local _r
     for (( _r=1; _r<_height-1; _r++ )); do
         local _row=$(( _top + _r ))
-        printf '\033[%d;%dH%s' "$_row" "$_left" "$_vr" >/dev/tty
-        printf '\033[%d;%dH%s' "$_row" "$(( _left + _width - 1 ))" "$_vr" >/dev/tty
+        printf '\033[%d;%dH%s' "$_row" "$_left" "$_vr" >&3
+        printf '\033[%d;%dH%s' "$_row" "$(( _left + _width - 1 ))" "$_vr" >&3
     done
 
     # Bottom border
     _shellframe_panel_hline "$(( _top + _height - 1 ))" "$_left" "$_width" "$_bl" "$_hr" "$_br"
-    printf '%s' "$_off" >/dev/tty
+    printf '%s' "$_off" >&3
 
     # Leave cursor at last row, column left (component contract)
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_panel_inner ─────────────────────────────────────────────────────

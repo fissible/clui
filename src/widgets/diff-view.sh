@@ -44,6 +44,14 @@
 
 SHELLFRAME_DIFF_VIEW_FOCUSED=0
 
+# Pane footer labels — set by the caller before render
+SHELLFRAME_DIFF_VIEW_LEFT_FOOTER=""     # e.g. "HEAD~3  abc1234  2026-03-18"
+SHELLFRAME_DIFF_VIEW_RIGHT_FOOTER=""    # e.g. "HEAD  def5678  2026-03-19"
+
+# File header styling — set by the caller for a custom look, or leave empty for default
+SHELLFRAME_DIFF_VIEW_FILE_HDR_ON=""     # ANSI sequence to start file header
+SHELLFRAME_DIFF_VIEW_FILE_HDR_OFF=""    # ANSI sequence to end file header
+
 # Gutter width: line number + space
 _SHELLFRAME_DV_GUTTER=5
 
@@ -85,21 +93,23 @@ _shellframe_dv_render_pane() {
     local _bold="${SHELLFRAME_BOLD:-}"
     local _reverse="${SHELLFRAME_REVERSE:-}"
 
+    # Build all output into a buffer (no subshells), then write once
+    local _buf="" _tmp=""
+
+    local _fh_on="${SHELLFRAME_DIFF_VIEW_FILE_HDR_ON:-${_bold}${_reverse}}"
+    local _fh_off="${SHELLFRAME_DIFF_VIEW_FILE_HDR_OFF:-${_reset}}"
+
     local _r
     for (( _r=0; _r < _height; _r++ )); do
         local _row_idx=$(( _scroll_top + _r ))
         local _screen_row=$(( _top + _r ))
 
-        # Position cursor and clear the line area
-        printf '\033[%d;%dH' "$_screen_row" "$_left" >/dev/tty
-        local _c
-        for (( _c=0; _c < _width; _c++ )); do
-            printf ' ' >/dev/tty
-        done
-        printf '\033[%d;%dH' "$_screen_row" "$_left" >/dev/tty
+        # Position cursor and clear the line area (printf -v, no fork)
+        printf -v _tmp '\033[%d;%dH%*s\033[%d;%dH' \
+            "$_screen_row" "$_left" "$_width" "" "$_screen_row" "$_left"
+        _buf+="$_tmp"
 
         if (( _row_idx >= SHELLFRAME_DIFF_ROW_COUNT )); then
-            # Past end of diff — leave blank
             continue
         fi
 
@@ -114,62 +124,59 @@ _shellframe_dv_render_pane() {
             _lnum="${SHELLFRAME_DIFF_RNUMS[$_row_idx]}"
         fi
 
-        # Render gutter (line number)
         case "$_type" in
             hdr)
                 if [[ "$_side" == "left" ]]; then
-                    printf '%s%s %-*.*s%s' "$_bold" "$_reverse" \
-                        "$(( _width - 1 ))" "$(( _width - 1 ))" "$_text" "$_reset" >/dev/tty
+                    printf -v _tmp '%s %-*.*s%s' "$_fh_on" \
+                        "$(( _width - 1 ))" "$(( _width - 1 ))" "$_text" "$_fh_off"
                 else
-                    printf '%s%s%*s%s' "$_bold" "$_reverse" "$_width" "" "$_reset" >/dev/tty
+                    printf -v _tmp '%s%*s%s' "$_fh_on" "$_width" "" "$_fh_off"
                 fi
+                _buf+="$_tmp"
                 continue
                 ;;
             sep)
-                printf '%s' "$_gray" >/dev/tty
                 local _pad=$(( (_width - 5) / 2 ))
                 (( _pad < 0 )) && _pad=0
-                for (( _c=0; _c < _pad; _c++ )); do printf ' ' >/dev/tty; done
-                printf '·····' >/dev/tty
-                printf '%s' "$_reset" >/dev/tty
+                printf -v _tmp '%s%*s·····%s' "$_gray" "$_pad" "" "$_reset"
+                _buf+="$_tmp"
                 continue
                 ;;
         esac
 
         # Line number or blank gutter
         if [[ -n "$_lnum" ]]; then
-            printf '%s%4s%s ' "$_gray" "$_lnum" "$_reset" >/dev/tty
+            printf -v _tmp '%s%4s%s ' "$_gray" "$_lnum" "$_reset"
+            _buf+="$_tmp"
         else
-            printf '     ' >/dev/tty
+            _buf+="     "
         fi
 
         # Content with type-based coloring
-        # Clip text to content width
         local _display="${_text:0:$_content_w}"
 
         case "$_type" in
             ctx)
-                printf '%s' "$_display" >/dev/tty
+                _buf+="$_display"
                 ;;
             add)
-                if [[ "$_side" == "right" ]]; then
-                    printf '%s%s%s' "$_green" "$_display" "$_reset" >/dev/tty
-                fi
+                [[ "$_side" == "right" ]] && _buf+="${_green}${_display}${_reset}"
                 ;;
             del)
-                if [[ "$_side" == "left" ]]; then
-                    printf '%s%s%s' "$_red" "$_display" "$_reset" >/dev/tty
-                fi
+                [[ "$_side" == "left" ]] && _buf+="${_red}${_display}${_reset}"
                 ;;
             chg)
                 if [[ "$_side" == "left" ]]; then
-                    printf '%s%s%s' "$_red" "$_display" "$_reset" >/dev/tty
+                    _buf+="${_red}${_display}${_reset}"
                 else
-                    printf '%s%s%s' "$_green" "$_display" "$_reset" >/dev/tty
+                    _buf+="${_green}${_display}${_reset}"
                 fi
                 ;;
         esac
     done
+
+    # Single write for the entire pane
+    printf '%s' "$_buf" >&3
 }
 
 # ── shellframe_diff_view_render ─────────────────────────────────────────────
@@ -177,33 +184,72 @@ _shellframe_dv_render_pane() {
 shellframe_diff_view_render() {
     local _top="$1" _left="$2" _width="$3" _height="$4"
 
-    # Draw the split separator
+    # Reserve bottom row for pane footers if either footer is set
+    local _content_h="$_height"
+    local _has_footer=0
+    if [[ -n "${SHELLFRAME_DIFF_VIEW_LEFT_FOOTER:-}" || -n "${SHELLFRAME_DIFF_VIEW_RIGHT_FOOTER:-}" ]]; then
+        _has_footer=1
+        _content_h=$(( _height - 1 ))
+        (( _content_h < 1 )) && _content_h=1
+    fi
+
+    # Draw the split separator (full height including footer row)
     shellframe_split_render "dv_split" "$_top" "$_left" "$_width" "$_height"
 
-    # Compute pane bounds
+    # Compute pane bounds for content area (excluding footer)
     local _lt _ll _lw _lh _rt _rl _rw _rh
-    shellframe_split_bounds "dv_split" 0 "$_top" "$_left" "$_width" "$_height" \
+    shellframe_split_bounds "dv_split" 0 "$_top" "$_left" "$_width" "$_content_h" \
         _lt _ll _lw _lh
-    shellframe_split_bounds "dv_split" 1 "$_top" "$_left" "$_width" "$_height" \
+    shellframe_split_bounds "dv_split" 1 "$_top" "$_left" "$_width" "$_content_h" \
         _rt _rl _rw _rh
 
     # Render each pane
     _shellframe_dv_render_pane "$_lt" "$_ll" "$_lw" "$_lh" "left"
     _shellframe_dv_render_pane "$_rt" "$_rl" "$_rw" "$_rh" "right"
+
+    # Render pane footers
+    if (( _has_footer )); then
+        local _footer_row=$(( _top + _height - 1 ))
+        local _gray="${SHELLFRAME_GRAY:-}"
+        local _reset="${SHELLFRAME_RESET:-}"
+        local _rev="${SHELLFRAME_REVERSE:-}"
+        local _fbuf="" _ftmp=""
+
+        # Left footer
+        local _lf="${SHELLFRAME_DIFF_VIEW_LEFT_FOOTER:-}"
+        local _lf_clipped="${_lf:0:$(( _lw - 1 ))}"
+        local _lpad=$(( _lw - ${#_lf_clipped} - 1 ))
+        (( _lpad < 0 )) && _lpad=0
+        printf -v _ftmp '\033[%d;%dH%s%s %s%*s%s' \
+            "$_footer_row" "$_ll" "$_rev" "$_gray" "$_lf_clipped" "$_lpad" "" "$_reset"
+        _fbuf+="$_ftmp"
+
+        # Right footer
+        local _rf="${SHELLFRAME_DIFF_VIEW_RIGHT_FOOTER:-}"
+        local _rf_clipped="${_rf:0:$(( _rw - 1 ))}"
+        local _rpad=$(( _rw - ${#_rf_clipped} - 1 ))
+        (( _rpad < 0 )) && _rpad=0
+        printf -v _ftmp '\033[%d;%dH%s%s %s%*s%s' \
+            "$_footer_row" "$_rl" "$_rev" "$_gray" "$_rf_clipped" "$_rpad" "" "$_reset"
+        _fbuf+="$_ftmp"
+
+        printf '%s' "$_fbuf" >&3
+    fi
 }
 
 # ── shellframe_diff_view_on_key ─────────────────────────────────────────────
 
 shellframe_diff_view_on_key() {
     local _key="$1"
+    local _count="${_SHELLFRAME_SHELL_KEY_COUNT:-1}"
 
     case "$_key" in
         "$SHELLFRAME_KEY_UP")
-            shellframe_sync_scroll_move "dv_sync" "dv_left" "up"
+            shellframe_sync_scroll_move "dv_sync" "dv_left" "up" "$_count"
             return 0
             ;;
         "$SHELLFRAME_KEY_DOWN")
-            shellframe_sync_scroll_move "dv_sync" "dv_left" "down"
+            shellframe_sync_scroll_move "dv_sync" "dv_left" "down" "$_count"
             return 0
             ;;
         "$SHELLFRAME_KEY_PAGE_UP")

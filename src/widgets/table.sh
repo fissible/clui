@@ -122,7 +122,7 @@ shellframe_table() {
 
     # ── Route TUI output to the real terminal ─────────────────────────────
     exec 3>&1
-    exec 1>/dev/tty
+    exec 1>&3
 
     # ── Cleanup ───────────────────────────────────────────────────────────
     SHELLFRAME_TBL_SAVED_STTY=$(shellframe_raw_save)

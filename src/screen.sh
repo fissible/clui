@@ -15,12 +15,17 @@
 # scrollback). This is what less, vim, top, etc. all do. The caller's terminal
 # content is hidden but preserved — shellframe_screen_exit restores it exactly.
 shellframe_screen_enter() {
-    printf '\033[?1049h'     # enable alternate screen buffer
-    printf '\033[H\033[3J\033[2J'  # cursor home + clear screen + clear scrollback
+    # Open a persistent fd to /dev/tty so widgets can write to >&3 instead
+    # of >/dev/tty (which opens+closes the file on every write and eventually
+    # exhausts file descriptors under rapid scrolling).
+    exec 3>/dev/tty
+    printf '\033[?1049h' >&3     # enable alternate screen buffer
+    printf '\033[H\033[3J\033[2J' >&3  # cursor home + clear screen + clear scrollback
 }
 
 shellframe_screen_exit() {
-    printf '\033[?1049l'  # disable alternate screen buffer (restores prior content)
+    printf '\033[?1049l' >&3  # disable alternate screen buffer (restores prior content)
+    exec 3>&-                  # close the persistent fd
 }
 
 # Clear the current screen and move cursor to top-left. Call at the start of
@@ -50,7 +55,7 @@ shellframe_screen_exit() {
 #     makes large-TUI performance independent of unchanged regions.
 #     Depends on Stage 1 being stable first.
 shellframe_screen_clear() {
-    printf '\033[H\033[3J\033[2J'
+    printf '\033[H\033[3J\033[2J' >&3
     # \033[H   — cursor home (top-left)
     # \033[3J  — erase saved lines (clears scrollback so the scrollbar
     #            doesn't shrink on each redraw)
@@ -59,8 +64,8 @@ shellframe_screen_clear() {
 
 # ── Cursor ───────────────────────────────────────────────────────────────────
 
-shellframe_cursor_hide() { printf '\033[?25l'; }
-shellframe_cursor_show() { printf '\033[?25h'; }
+shellframe_cursor_hide() { printf '\033[?25l' >&3; }
+shellframe_cursor_show() { printf '\033[?25h' >&3; }
 
 # ── Raw terminal mode ─────────────────────────────────────────────────────────
 #
@@ -82,12 +87,12 @@ shellframe_raw_enter() {
     stty -echo -icanon -icrnl min 1 time 0 2>/dev/null
     # Enable bracketed paste mode: terminal wraps pasted text in
     # ESC[200~ ... ESC[201~ so the editor can batch-insert it instantly.
-    printf '\033[?2004h' >/dev/tty
+    printf '\033[?2004h' >&3
 }
 # -icrnl: stop the tty from translating CR (\r) → NL (\n) on input.
 # Without this, Enter arrives as \n, but bash's `read` strips trailing
 # newlines and returns an empty string — so \n can never be matched.
 shellframe_raw_exit()  {
-    printf '\033[?2004l' >/dev/tty  # disable bracketed paste mode
+    printf '\033[?2004l' >&3  # disable bracketed paste mode
     stty "$1" 2>/dev/null || true
 }

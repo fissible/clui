@@ -282,20 +282,18 @@ shellframe_split_render() {
         local _pos="${!_pos_var}"
 
         if [[ "$_dir" == "v" ]]; then
-            # Vertical separator: column of │
-            local _r
+            # Vertical separator: printf -v to avoid subshells
+            local _buf="" _tmp="" _r
             for (( _r=0; _r < _height; _r++ )); do
-                printf '\033[%d;%dH%s│%s' \
-                    "$(( _top + _r ))" "$_pos" "$_color" "$_reset" >/dev/tty
+                printf -v _tmp '\033[%d;%dH│' "$(( _top + _r ))" "$_pos"
+                _buf+="$_tmp"
             done
+            printf '%s%s%s' "$_color" "$_buf" "$_reset" >&3
         else
-            # Horizontal separator: row of ─
-            printf '\033[%d;%dH%s' "$_pos" "$_left" "$_color" >/dev/tty
-            local _c
-            for (( _c=0; _c < _width; _c++ )); do
-                printf '─' >/dev/tty
-            done
-            printf '%s' "$_reset" >/dev/tty
+            # Horizontal separator: single printf with repeated ─
+            local _fill="" _c
+            for (( _c=0; _c < _width; _c++ )); do _fill+="─"; done
+            printf '\033[%d;%dH%s%s%s' "$_pos" "$_left" "$_color" "$_fill" "$_reset" >&3
         fi
     done
 }

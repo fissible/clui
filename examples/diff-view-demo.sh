@@ -41,13 +41,13 @@ _dv_ROOT_render() {
 
 _dv_ROOT_header_render() {
     local _top="$1" _left="$2" _w="$3"
-    printf '\033[%d;%dH%s' "$_top" "$_left" "${SHELLFRAME_REVERSE:-}" >/dev/tty
+    printf '\033[%d;%dH%s' "$_top" "$_left" "${SHELLFRAME_REVERSE:-}" >&3
     local _title
     _title=$(printf ' Diff: HEAD~%s  (%d rows)' "$RANGE" "$SHELLFRAME_DIFF_ROW_COUNT")
-    printf '%s' "$_title" >/dev/tty
+    printf '%s' "$_title" >&3
     local _pad=$(( _w - ${#_title} ))
-    local _i; for (( _i=0; _i < _pad; _i++ )); do printf ' ' >/dev/tty; done
-    printf '%s' "${SHELLFRAME_RESET:-}" >/dev/tty
+    local _i; for (( _i=0; _i < _pad; _i++ )); do printf ' ' >&3; done
+    printf '%s' "${SHELLFRAME_RESET:-}" >&3
 }
 
 _dv_ROOT_diff_render() {
@@ -64,12 +64,12 @@ _dv_ROOT_diff_on_focus() {
 
 _dv_ROOT_footer_render() {
     local _top="$1" _left="$2" _w="$3"
-    printf '\033[%d;%dH%s' "$_top" "$_left" "${SHELLFRAME_GRAY:-}" >/dev/tty
+    printf '\033[%d;%dH%s' "$_top" "$_left" "${SHELLFRAME_GRAY:-}" >&3
     local _msg="Up/Down: scroll  PgUp/PgDn: page  Home/End: jump  q: quit"
-    printf '%s' "$_msg" >/dev/tty
+    printf '%s' "$_msg" >&3
     local _pad=$(( _w - ${#_msg} ))
-    local _i; for (( _i=0; _i < _pad; _i++ )); do printf ' ' >/dev/tty; done
-    printf '%s' "${SHELLFRAME_RESET:-}" >/dev/tty
+    local _i; for (( _i=0; _i < _pad; _i++ )); do printf ' ' >&3; done
+    printf '%s' "${SHELLFRAME_RESET:-}" >&3
 }
 
 _dv_ROOT_quit() {

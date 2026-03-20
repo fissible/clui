@@ -83,7 +83,7 @@ shellframe_list_render() {
         local _item_idx=$(( _scroll_top + _r ))
 
         # Clear this row (only within the list's own column range)
-        printf '\033[%d;%dH%*s' "$_row" "$_left" "$_width" '' >/dev/tty
+        printf '\033[%d;%dH%*s' "$_row" "$_left" "$_width" '' >&3
 
         [[ $_item_idx -ge $_n ]] && continue
 
@@ -103,27 +103,34 @@ shellframe_list_render() {
         local _clipped
         _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_width")
 
-        printf '\033[%d;%dH' "$_row" "$_left" >/dev/tty
+        printf '\033[%d;%dH' "$_row" "$_left" >&3
 
         if (( _item_idx == _cursor )); then
-            # Highlight cursor row
-            printf '%s' "$_rev" >/dev/tty
-            printf '%s' "$_clipped" >/dev/tty
+            # Highlight cursor row: reverse when focused, dim bg when not
+            local _hl
+            if (( _focused )); then
+                _hl="$_rev"
+            else
+                # Dark gray background (236) with normal text — subtle indicator
+                _hl=$'\033[48;5;236m'
+            fi
+            printf '%s' "$_hl" >&3
+            printf '%s' "$_clipped" >&3
             # Pad to full width under highlight
             local _clen=${#_clipped}
             local _k=0
             while (( _k < _width - _clen )); do
-                printf ' ' >/dev/tty
+                printf ' ' >&3
                 (( _k++ ))
             done
-            printf '%s' "$_rst" >/dev/tty
+            printf '%s' "$_rst" >&3
         else
-            printf '%s' "$_clipped" >/dev/tty
+            printf '%s' "$_clipped" >&3
         fi
     done
 
     # Leave cursor at last row, col left (component contract)
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_list_on_key ────────────────────────────────────────────────────

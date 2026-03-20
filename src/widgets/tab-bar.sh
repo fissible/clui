@@ -53,7 +53,7 @@ shellframe_tabbar_render() {
     local _n=${#SHELLFRAME_TABBAR_LABELS[@]}
 
     # Clear the row
-    printf '\033[%d;%dH\033[2K' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH\033[2K' "$_top" "$_left" >&3
 
     [[ $_n -eq 0 ]] && return 0
 
@@ -67,7 +67,7 @@ shellframe_tabbar_render() {
     local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
     local _focused="${SHELLFRAME_TABBAR_FOCUSED:-0}"
 
-    printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$_top" "$_left" >&3
 
     local _remaining="$_width" _i
     for (( _i=0; _i<_n; _i++ )); do
@@ -95,33 +95,33 @@ shellframe_tabbar_render() {
         # Active tab: bold, default background (clear).
         # Inactive tabs: _bg (reverse video by default, overridable via SHELLFRAME_TABBAR_BG).
         if (( _i == _active )); then
-            printf '%s%s%s' "$_bold" "$_tab" "$_rst" >/dev/tty
+            printf '%s%s%s' "$_bold" "$_tab" "$_rst" >&3
         else
-            printf '%s%s%s' "$_bg" "$_tab" "$_rst" >/dev/tty
+            printf '%s%s%s' "$_bg" "$_tab" "$_rst" >&3
         fi
 
         (( _remaining -= _tlen ))
 
         # Separator between tabs (1 terminal column)
         if (( _i < _n-1 && _remaining > 0 )); then
-            printf '%s' "$_SHELLFRAME_TABBAR_SEP" >/dev/tty
+            printf '%s' "$_SHELLFRAME_TABBAR_SEP" >&3
             (( _remaining-- ))
         fi
     done
 
     # Fill remaining space with _bg to complete the solid bar.
     if (( _remaining > 0 )); then
-        printf '%s' "$_bg" >/dev/tty
+        printf '%s' "$_bg" >&3
         local _k=0
         while (( _k < _remaining )); do
-            printf ' ' >/dev/tty
+            printf ' ' >&3
             (( _k++ ))
         done
-        printf '%s' "$_rst" >/dev/tty
+        printf '%s' "$_rst" >&3
     fi
 
     # Leave cursor at start of row (component contract)
-    printf '\033[%d;%dH' "$_top" "$_left" >/dev/tty
+    printf '\033[%d;%dH' "$_top" "$_left" >&3
 }
 
 # ── shellframe_tabbar_on_key ────────────────────────────────────────────────
