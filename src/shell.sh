@@ -216,12 +216,24 @@ _shellframe_shell_region_bounds() {
 
 # _shellframe_shell_terminal_size out_rows out_cols
 # Read terminal dimensions.  Falls back to 24×80 if stty is unavailable.
+# Results are cached in _SHELLFRAME_SHELL_ROWS/_COLS — call
+# _shellframe_shell_refresh_size to update the cache (done once per draw).
+_SHELLFRAME_SHELL_ROWS=24
+_SHELLFRAME_SHELL_COLS=80
+
+_shellframe_shell_refresh_size() {
+    # Command substitution (not process substitution) to avoid fd leaks
+    # on bash 3.2/macOS.  < <(stty ...) leaks /dev/fd/NN per call.
+    local _sz
+    _sz=$(stty size </dev/tty 2>/dev/null) || _sz="24 80"
+    _SHELLFRAME_SHELL_ROWS="${_sz%% *}"
+    _SHELLFRAME_SHELL_COLS="${_sz##* }"
+}
+
 _shellframe_shell_terminal_size() {
     local _out_rows="$1" _out_cols="$2"
-    local _r=24 _c=80
-    IFS=' ' read -r _r _c < <(stty size </dev/tty 2>/dev/null) || true
-    printf -v "$_out_rows" '%d' "$_r"
-    printf -v "$_out_cols" '%d' "$_c"
+    printf -v "$_out_rows" '%d' "$_SHELLFRAME_SHELL_ROWS"
+    printf -v "$_out_cols" '%d' "$_SHELLFRAME_SHELL_COLS"
 }
 
 # ── _shellframe_shell_draw ────────────────────────────────────────────────────
@@ -231,27 +243,16 @@ _shellframe_shell_terminal_size() {
 _shellframe_shell_draw() {
     local _prefix="$1" _screen="$2"
 
-    # Re-register regions from scratch (handles terminal resize)
-    _SHELLFRAME_SHELL_REGIONS=()
-    "${_prefix}_${_screen}_render"
+    # Refresh terminal size once per draw (no per-call stty forks)
+    _shellframe_shell_refresh_size
 
-    # Rebuild focus ring, preserving current focus owner by name
-    _shellframe_shell_focus_init
-
+    # Fire on_focus using the PREVIOUS cycle's focus ring, so callbacks
+    # can update state (e.g. sidebar width) before regions are re-registered.
     local _focused
     _shellframe_shell_focus_owner _focused
-
-    # Render each region: fire on_focus then render
-    local _entry
+    local _entry _n
     for _entry in "${_SHELLFRAME_SHELL_REGIONS[@]+"${_SHELLFRAME_SHELL_REGIONS[@]}"}"; do
-        local _n="${_entry%%:*}"
-        local _rest="${_entry#*:}"
-        local _top="${_rest%%:*}"; _rest="${_rest#*:}"
-        local _left="${_rest%%:*}"; _rest="${_rest#*:}"
-        local _w="${_rest%%:*}"; _rest="${_rest#*:}"
-        local _h="${_rest%%:*}"
-
-        # Fire on_focus if the handler exists
+        _n="${_entry%%:*}"
         if declare -f "${_prefix}_${_screen}_${_n}_on_focus" >/dev/null 2>&1; then
             if [[ "$_n" == "$_focused" ]]; then
                 "${_prefix}_${_screen}_${_n}_on_focus" 1
@@ -259,8 +260,24 @@ _shellframe_shell_draw() {
                 "${_prefix}_${_screen}_${_n}_on_focus" 0
             fi
         fi
+    done
 
-        # Render the region
+    # Re-register regions from scratch (layout uses updated focus state)
+    _SHELLFRAME_SHELL_REGIONS=()
+    "${_prefix}_${_screen}_render"
+
+    # Rebuild focus ring, preserving current focus owner by name
+    _shellframe_shell_focus_init
+
+    # Render each region
+    for _entry in "${_SHELLFRAME_SHELL_REGIONS[@]+"${_SHELLFRAME_SHELL_REGIONS[@]}"}"; do
+        _n="${_entry%%:*}"
+        local _rest="${_entry#*:}"
+        local _top="${_rest%%:*}"; _rest="${_rest#*:}"
+        local _left="${_rest%%:*}"; _rest="${_rest#*:}"
+        local _w="${_rest%%:*}"; _rest="${_rest#*:}"
+        local _h="${_rest%%:*}"
+
         if declare -f "${_prefix}_${_screen}_${_n}_render" >/dev/null 2>&1; then
             "${_prefix}_${_screen}_${_n}_render" "$_top" "$_left" "$_w" "$_h"
         fi

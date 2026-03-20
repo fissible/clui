@@ -97,8 +97,9 @@ shellframe_action_list() {
     # ── Draw ──────────────────────────────────────────────────────────────
     _al_draw() {
         # Resize detection: if terminal size changed, escalate to full redraw
-        local _cur_rows=24 _cur_cols=80
-        { read -r _cur_rows _cur_cols; } < <(stty size </dev/tty 2>/dev/null) || true
+        local _cur_rows=24 _cur_cols=80 _sz
+        _sz=$(stty size </dev/tty 2>/dev/null) || _sz="24 80"
+        _cur_rows="${_sz%% *}"; _cur_cols="${_sz##* }"
         if (( _cur_rows != _prev_rows || _cur_cols != _prev_cols )); then
             _dirty=2
             _prev_rows=$_cur_rows

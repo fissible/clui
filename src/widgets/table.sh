@@ -157,8 +157,9 @@ shellframe_table() {
     # ── Main draw ─────────────────────────────────────────────────────────
     _tbl_draw() {
         # ── Terminal size and resize check ────────────────────────────────
-        local _rows=24 _cols=80
-        { read -r _rows _cols; } < <(stty size </dev/tty 2>/dev/null) || true
+        local _rows=24 _cols=80 _sz
+        _sz=$(stty size </dev/tty 2>/dev/null) || _sz="24 80"
+        _rows="${_sz%% *}"; _cols="${_sz##* }"
         SHELLFRAME_TBL_COLS=$_cols
 
         if (( _rows != _prev_rows || _cols != _prev_cols )); then

@@ -26,8 +26,9 @@
 #   SHELLFRAME_DIFF_LNUMS[]   — left line number (empty if no left content)
 #   SHELLFRAME_DIFF_RNUMS[]   — right line number (empty if no right content)
 #   SHELLFRAME_DIFF_ROW_COUNT — total visual rows
-#   SHELLFRAME_DIFF_FILES[]   — file names in order of appearance
-#   SHELLFRAME_DIFF_FILE_ROWS[] — row index where each file's header starts
+#   SHELLFRAME_DIFF_FILES[]      — file names in order of appearance
+#   SHELLFRAME_DIFF_FILE_ROWS[]  — row index where each file's header starts
+#   SHELLFRAME_DIFF_FILE_STATUS[] — "added" | "deleted" | "modified" per file
 #
 # ── Row types ────────────────────────────────────────────────────────────────
 #
@@ -61,6 +62,7 @@ SHELLFRAME_DIFF_RNUMS=()
 SHELLFRAME_DIFF_ROW_COUNT=0
 SHELLFRAME_DIFF_FILES=()        # file names in order of appearance
 SHELLFRAME_DIFF_FILE_ROWS=()    # row index where each file starts
+SHELLFRAME_DIFF_FILE_STATUS=()  # "added" | "deleted" | "modified" per file
 
 # ── shellframe_diff_clear ───────────────────────────────────────────────────
 
@@ -72,6 +74,7 @@ shellframe_diff_clear() {
     SHELLFRAME_DIFF_RNUMS=()
     SHELLFRAME_DIFF_FILES=()
     SHELLFRAME_DIFF_FILE_ROWS=()
+    SHELLFRAME_DIFF_FILE_STATUS=()
     SHELLFRAME_DIFF_ROW_COUNT=0
 }
 
@@ -157,20 +160,33 @@ shellframe_diff_parse() {
             local _fname="${_line#diff --git a/}"
             _fname="${_fname%% b/*}"
 
-            # Track file index
+            # Track file index (default status "modified"; updated by ---/+++ parsing)
             SHELLFRAME_DIFF_FILES+=("$_fname")
             SHELLFRAME_DIFF_FILE_ROWS+=("${#SHELLFRAME_DIFF_TYPES[@]}")
+            SHELLFRAME_DIFF_FILE_STATUS+=("modified")
 
             SHELLFRAME_DIFF_TYPES+=("hdr")
             SHELLFRAME_DIFF_LEFT+=("$_fname")
-            SHELLFRAME_DIFF_RIGHT+=("")
+            SHELLFRAME_DIFF_RIGHT+=("$_fname")
             SHELLFRAME_DIFF_LNUMS+=("")
             SHELLFRAME_DIFF_RNUMS+=("")
             continue
         fi
 
-        # Skip index, ---, +++ lines
+        # Track file status from --- / +++ lines
         [[ "$_line" == "index "* ]] && continue
+        if [[ "$_line" == "--- /dev/null" ]]; then
+            # New file — mark the last file as "added"
+            local _fi=$(( ${#SHELLFRAME_DIFF_FILE_STATUS[@]} - 1 ))
+            (( _fi >= 0 )) && SHELLFRAME_DIFF_FILE_STATUS[$_fi]="added"
+            continue
+        fi
+        if [[ "$_line" == "+++ /dev/null" ]]; then
+            # Deleted file — mark the last file as "deleted"
+            local _fi=$(( ${#SHELLFRAME_DIFF_FILE_STATUS[@]} - 1 ))
+            (( _fi >= 0 )) && SHELLFRAME_DIFF_FILE_STATUS[$_fi]="deleted"
+            continue
+        fi
         [[ "$_line" == "--- "* ]] && continue
         [[ "$_line" == "+++ "* ]] && continue
 

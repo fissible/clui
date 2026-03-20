@@ -93,6 +93,13 @@ _shellframe_dv_render_pane() {
     local _bold="${SHELLFRAME_BOLD:-}"
     local _reverse="${SHELLFRAME_REVERSE:-}"
 
+    # When unfocused, dim all content so the focused widget stands out
+    local _dim="" _undim=""
+    if (( ! SHELLFRAME_DIFF_VIEW_FOCUSED )); then
+        _dim=$'\033[2m'      # ANSI dim/faint attribute
+        _undim="${_reset}"
+    fi
+
     # Build all output into a buffer (no subshells), then write once
     local _buf="" _tmp=""
 
@@ -107,9 +114,10 @@ _shellframe_dv_render_pane() {
         # Position cursor and clear the line area (printf -v, no fork)
         printf -v _tmp '\033[%d;%dH%*s\033[%d;%dH' \
             "$_screen_row" "$_left" "$_width" "" "$_screen_row" "$_left"
-        _buf+="$_tmp"
+        _buf+="${_tmp}${_dim}"
 
         if (( _row_idx >= SHELLFRAME_DIFF_ROW_COUNT )); then
+            _buf+="$_undim"
             continue
         fi
 
@@ -126,20 +134,41 @@ _shellframe_dv_render_pane() {
 
         case "$_type" in
             hdr)
+                # Look up file status for this header row
+                local _fstatus="modified" _fi
+                for (( _fi=0; _fi < ${#SHELLFRAME_DIFF_FILE_ROWS[@]}; _fi++ )); do
+                    if (( SHELLFRAME_DIFF_FILE_ROWS[_fi] == _row_idx )); then
+                        _fstatus="${SHELLFRAME_DIFF_FILE_STATUS[$_fi]:-modified}"
+                        break
+                    fi
+                done
+
+                local _status_label=""
                 if [[ "$_side" == "left" ]]; then
-                    printf -v _tmp '%s %-*.*s%s' "$_fh_on" \
-                        "$(( _width - 1 ))" "$(( _width - 1 ))" "$_text" "$_fh_off"
+                    case "$_fstatus" in
+                        deleted) _status_label=" [deleted]" ;;
+                        added)   _status_label="" ;;
+                        *)       _status_label="" ;;
+                    esac
                 else
-                    printf -v _tmp '%s%*s%s' "$_fh_on" "$_width" "" "$_fh_off"
+                    case "$_fstatus" in
+                        added)   _status_label=" [added]" ;;
+                        deleted) _status_label="" ;;
+                        *)       _status_label="" ;;
+                    esac
                 fi
-                _buf+="$_tmp"
+
+                local _hdr_text="${_text}${_status_label}"
+                printf -v _tmp '%s %-*.*s%s' "$_fh_on" \
+                    "$(( _width - 1 ))" "$(( _width - 1 ))" "$_hdr_text" "$_fh_off"
+                _buf+="${_tmp}${_undim}"
                 continue
                 ;;
             sep)
                 local _pad=$(( (_width - 5) / 2 ))
                 (( _pad < 0 )) && _pad=0
                 printf -v _tmp '%s%*s·····%s' "$_gray" "$_pad" "" "$_reset"
-                _buf+="$_tmp"
+                _buf+="${_tmp}${_undim}"
                 continue
                 ;;
         esac
@@ -173,6 +202,7 @@ _shellframe_dv_render_pane() {
                 fi
                 ;;
         esac
+        _buf+="$_undim"
     done
 
     # Single write for the entire pane
