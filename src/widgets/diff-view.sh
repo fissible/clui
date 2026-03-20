@@ -82,6 +82,39 @@ shellframe_diff_view_init() {
     shellframe_sync_scroll_init "dv_sync" "dv_left" "dv_right"
 }
 
+# ── _shellframe_dv_clip_ansi ─────────────────────────────────────────────────
+#
+# Clip an ANSI-colored string to a visible width.  Walks the string,
+# skips escape sequences (which are zero-width), counts visible chars.
+# Usage: _shellframe_dv_clip_ansi "string" width out_var
+
+_shellframe_dv_clip_ansi() {
+    local _str="$1" _max="$2" _out="$3"
+    local _result="" _vis=0 _i=0 _len=${#_str}
+
+    while (( _i < _len && _vis < _max )); do
+        local _ch="${_str:$_i:1}"
+        if [[ "$_ch" == $'\033' ]]; then
+            # Start of escape sequence — copy until 'm' (end of SGR)
+            local _seq="$_ch"
+            (( _i++ ))
+            while (( _i < _len )); do
+                _ch="${_str:$_i:1}"
+                _seq+="$_ch"
+                (( _i++ ))
+                [[ "$_ch" == "m" ]] && break
+            done
+            _result+="$_seq"
+        else
+            _result+="$_ch"
+            (( _vis++ ))
+            (( _i++ ))
+        fi
+    done
+
+    printf -v "$_out" '%s' "$_result"
+}
+
 # ── _shellframe_dv_render_pane ──────────────────────────────────────────────
 
 # Render one side of the diff (left or right).
@@ -296,6 +329,11 @@ _shellframe_dv_render_pane() {
                 ;;
         esac
 
+        # Detect blank opposite side (add on left, del on right)
+        local _is_blank_opposite=0
+        if [[ "$_type" == "add" && "$_side" == "left" ]]; then _is_blank_opposite=1; fi
+        if [[ "$_type" == "del" && "$_side" == "right" ]]; then _is_blank_opposite=1; fi
+
         # Gutter: [dark: space linenum space] [change: space +/- space]
         local _indicator=" "
         case "$_type" in
@@ -307,24 +345,30 @@ _shellframe_dv_render_pane() {
         # Line number zone: slightly darker background
         local _ln_bg=$'\033[48;5;233m'  # very dark gray
         local _ln_fg=$'\033[38;5;252m'  # white-ish for line numbers
-        if [[ -n "$_lnum" ]]; then
-            printf -v _tmp '%s %s%4s %s' "$_ln_bg" "$_ln_fg" "$_lnum" "$_reset"
+        if (( _is_blank_opposite )); then
+            # Entire gutter dark on blank side
+            printf -v _tmp '%s         %s' "$_ln_bg" "$_reset"
+            _buf+="$_tmp"
         else
-            printf -v _tmp '%s      %s' "$_ln_bg" "$_reset"
-        fi
-        _buf+="$_tmp"
+            if [[ -n "$_lnum" ]]; then
+                printf -v _tmp '%s %s%4s %s' "$_ln_bg" "$_ln_fg" "$_lnum" "$_reset"
+            else
+                printf -v _tmp '%s      %s' "$_ln_bg" "$_reset"
+            fi
+            _buf+="$_tmp"
 
-        # Change indicator zone: background matches the content change color
-        local _ind_bg="" _ind_fg=""
-        case "$_indicator" in
-            "+") _ind_bg="${_add_on}"; _ind_fg="$_add_ind" ;;
-            "-") _ind_bg="${_del_on}"; _ind_fg="$_del_ind" ;;
-            *)   _ind_bg=""; _ind_fg="" ;;
-        esac
-        if [[ -n "$_ind_bg" ]]; then
-            _buf+="${_ind_bg} ${_ind_fg}${_indicator}${_ind_bg} ${_reset}"
-        else
-            _buf+="   "
+            # Change indicator zone: background matches the content change color
+            local _ind_bg="" _ind_fg=""
+            case "$_indicator" in
+                "+") _ind_bg="${_add_on}"; _ind_fg="$_add_ind" ;;
+                "-") _ind_bg="${_del_on}"; _ind_fg="$_del_ind" ;;
+                *)   _ind_bg=""; _ind_fg="" ;;
+            esac
+            if [[ -n "$_ind_bg" ]]; then
+                _buf+="${_ind_bg} ${_ind_fg}${_indicator}${_ind_bg} ${_reset}"
+            else
+                _buf+="   "
+            fi
         fi
 
         # Content: expand tabs to spaces before measuring/clipping
@@ -345,8 +389,9 @@ _shellframe_dv_render_pane() {
                     fi
                 fi
                 if [[ -n "$_hl_text" ]]; then
-                    # bat output has ANSI codes — clip to content width (approximate)
-                    _buf+="${_hl_text:0:$(( _content_w * 3 ))}${_reset}"
+                    local _hl_clipped
+                    _shellframe_dv_clip_ansi "$_hl_text" "$_content_w" _hl_clipped
+                    _buf+="${_hl_clipped}${_reset}"
                 else
                     _buf+=$'\033[38;5;245m'"${_display}${_reset}"
                 fi
@@ -355,11 +400,17 @@ _shellframe_dv_render_pane() {
                 if [[ "$_side" == "right" ]]; then
                     printf -v _tmp '%s%s%*s%s' "$_add_on" "$_display" "$_fill_n" "" "$_reset"
                     _buf+="$_tmp"
+                else
+                    printf -v _tmp '%s%*s%s' "$_ln_bg" "$_content_w" "" "$_reset"
+                    _buf+="$_tmp"
                 fi
                 ;;
             del)
                 if [[ "$_side" == "left" ]]; then
                     printf -v _tmp '%s%s%*s%s' "$_del_on" "$_display" "$_fill_n" "" "$_reset"
+                    _buf+="$_tmp"
+                else
+                    printf -v _tmp '%s%*s%s' "$_ln_bg" "$_content_w" "" "$_reset"
                     _buf+="$_tmp"
                 fi
                 ;;
