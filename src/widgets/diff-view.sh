@@ -43,6 +43,8 @@
 #     Track focus state for visual indicator.
 
 SHELLFRAME_DIFF_VIEW_FOCUSED=0
+SHELLFRAME_DIFF_VIEW_LEFT_FOCUSED=0    # per-pane focus (for split-region mode)
+SHELLFRAME_DIFF_VIEW_RIGHT_FOCUSED=0
 
 # Pane footer labels — set by the caller before render
 SHELLFRAME_DIFF_VIEW_LEFT_FOOTER=""     # left side: ref + tag + sha + subject
@@ -54,8 +56,15 @@ SHELLFRAME_DIFF_VIEW_RIGHT_DATE=""      # right-aligned date for right pane
 SHELLFRAME_DIFF_VIEW_FILE_HDR_ON=""     # ANSI sequence to start file header
 SHELLFRAME_DIFF_VIEW_FILE_HDR_OFF=""    # ANSI sequence to end file header
 
-# Gutter width: line number (4) + indicator (1) + space (1)
-_SHELLFRAME_DV_GUTTER=6
+# Syntax-highlighted content — parallel arrays indexed by diff row.
+# If set and non-empty for a row, used instead of plain text for ctx lines.
+# Caller populates these (e.g. via bat). Leave empty to disable.
+SHELLFRAME_DIFF_VIEW_HL_LEFT=()
+SHELLFRAME_DIFF_VIEW_HL_RIGHT=()
+SHELLFRAME_DIFF_VIEW_HL_ENABLED=0
+
+# Gutter width: space(1) + linenum(4) + space(1) + space(1) + indicator(1) + space(1) = 9
+_SHELLFRAME_DV_GUTTER=9
 
 # ── shellframe_diff_view_init ───────────────────────────────────────────────
 
@@ -86,7 +95,11 @@ _shellframe_dv_render_pane() {
     local _content_w=$(( _width - _gutter ))
     (( _content_w < 1 )) && _content_w=1
 
-    # Update scroll viewport
+    # Update scroll viewport and total rows (padding = viewport height so
+    # the last file can be scrolled to the top for selection)
+    local _total=$(( SHELLFRAME_DIFF_ROW_COUNT + _height ))
+    local _rows_var="_SHELLFRAME_SCROLL_${_scroll_ctx}_ROWS"
+    printf -v "$_rows_var" '%d' "$_total"
     shellframe_scroll_resize "$_scroll_ctx" "$_height" "$_content_w"
 
     local _scroll_top
@@ -105,10 +118,18 @@ _shellframe_dv_render_pane() {
     local _add_ind=$'\033[38;5;78m'                    # brighter green indicator
     local _del_ind=$'\033[38;5;167m'                   # warmer red indicator
 
-    # When unfocused, dim all content so the focused widget stands out
+    # Per-pane focus: check side-specific focus, fall back to widget-level
+    local _pane_focused=0
+    if [[ "$_side" == "left" ]]; then
+        _pane_focused="${SHELLFRAME_DIFF_VIEW_LEFT_FOCUSED:-$SHELLFRAME_DIFF_VIEW_FOCUSED}"
+    else
+        _pane_focused="${SHELLFRAME_DIFF_VIEW_RIGHT_FOCUSED:-$SHELLFRAME_DIFF_VIEW_FOCUSED}"
+    fi
+
+    # When unfocused, dim all content so the focused pane stands out
     local _dim="" _undim=""
-    if (( ! SHELLFRAME_DIFF_VIEW_FOCUSED )); then
-        _dim=$'\033[2m'      # ANSI dim/faint attribute
+    if (( ! _pane_focused )); then
+        _dim=$'\033[2m'
         _undim="${_reset}"
     fi
 
@@ -263,15 +284,19 @@ _shellframe_dv_render_pane() {
                 continue
                 ;;
             sep)
-                local _pad=$(( (_width - 5) / 2 ))
-                (( _pad < 0 )) && _pad=0
-                printf -v _tmp '%s%*s·····%s' "$_gray" "$_pad" "" "$_reset"
+                # Dark background matching line number zone, centered dots
+                local _sep_bg=$'\033[48;5;233m'
+                local _sep_txt=$'\033[38;5;241m'
+                local _sep_label=" ···"
+                local _sep_pad=$(( _width - ${#_sep_label} ))
+                (( _sep_pad < 0 )) && _sep_pad=0
+                printf -v _tmp '%s%s%s%*s%s' "$_sep_bg" "$_sep_txt" "$_sep_label" "$_sep_pad" "" "$_reset"
                 _buf+="${_tmp}${_undim}"
                 continue
                 ;;
         esac
 
-        # Gutter: line number + indicator column (+/-/space)
+        # Gutter: [dark: space linenum space] [change: space +/- space]
         local _indicator=" "
         case "$_type" in
             add) [[ "$_side" == "right" ]] && _indicator="+" ;;
@@ -279,16 +304,27 @@ _shellframe_dv_render_pane() {
             chg) if [[ "$_side" == "left" ]]; then _indicator="-"; else _indicator="+"; fi ;;
         esac
 
-        local _ind_color=""
-        case "$_indicator" in
-            "+") _ind_color="$_add_ind" ;;
-            "-") _ind_color="$_del_ind" ;;
-        esac
-
+        # Line number zone: slightly darker background
+        local _ln_bg=$'\033[48;5;233m'  # very dark gray
+        local _ln_fg=$'\033[38;5;252m'  # white-ish for line numbers
         if [[ -n "$_lnum" ]]; then
-            _buf+="${_gray}$(printf '%4s' "$_lnum")${_reset}${_ind_color}${_indicator}${_reset} "
+            printf -v _tmp '%s %s%4s %s' "$_ln_bg" "$_ln_fg" "$_lnum" "$_reset"
         else
-            _buf+="    ${_ind_color}${_indicator}${_reset} "
+            printf -v _tmp '%s      %s' "$_ln_bg" "$_reset"
+        fi
+        _buf+="$_tmp"
+
+        # Change indicator zone: background matches the content change color
+        local _ind_bg="" _ind_fg=""
+        case "$_indicator" in
+            "+") _ind_bg="${_add_on}"; _ind_fg="$_add_ind" ;;
+            "-") _ind_bg="${_del_on}"; _ind_fg="$_del_ind" ;;
+            *)   _ind_bg=""; _ind_fg="" ;;
+        esac
+        if [[ -n "$_ind_bg" ]]; then
+            _buf+="${_ind_bg} ${_ind_fg}${_indicator}${_ind_bg} ${_reset}"
+        else
+            _buf+="   "
         fi
 
         # Content: expand tabs to spaces before measuring/clipping
@@ -299,8 +335,21 @@ _shellframe_dv_render_pane() {
 
         case "$_type" in
             ctx)
-                # Dim context lines so changes pop
-                _buf+=$'\033[38;5;245m'"${_display}${_reset}"
+                # Use syntax-highlighted text if available, otherwise dim
+                local _hl_text=""
+                if (( SHELLFRAME_DIFF_VIEW_HL_ENABLED )) && (( _row_idx >= 0 )); then
+                    if [[ "$_side" == "left" ]]; then
+                        _hl_text="${SHELLFRAME_DIFF_VIEW_HL_LEFT[$_row_idx]:-}"
+                    else
+                        _hl_text="${SHELLFRAME_DIFF_VIEW_HL_RIGHT[$_row_idx]:-}"
+                    fi
+                fi
+                if [[ -n "$_hl_text" ]]; then
+                    # bat output has ANSI codes — clip to content width (approximate)
+                    _buf+="${_hl_text:0:$(( _content_w * 3 ))}${_reset}"
+                else
+                    _buf+=$'\033[38;5;245m'"${_display}${_reset}"
+                fi
                 ;;
             add)
                 if [[ "$_side" == "right" ]]; then
@@ -400,6 +449,57 @@ shellframe_diff_view_render() {
         local _rmid=$(( _frw - ${#_rf_clip} - ${#_rd} - 2 ))
         (( _rmid < 0 )) && _rmid=0
         printf -v _ftmp '%*s%s %s' "$_rmid" "" "$_rd" "$_reset"
+        _fbuf+="$_ftmp"
+
+        printf '%s' "$_fbuf" >&3
+    fi
+}
+
+# ── shellframe_diff_view_render_side ─────────────────────────────────────────
+#
+# Render a single side of the diff (for split-region mode where each pane
+# is a separate shell.sh region).
+#   shellframe_diff_view_render_side top left width height side
+#   side: "left" | "right"
+
+shellframe_diff_view_render_side() {
+    local _top="$1" _left="$2" _width="$3" _height="$4" _side="$5"
+
+    # Reserve bottom row for footer if set
+    local _content_h="$_height"
+    local _footer_key _date_key
+    if [[ "$_side" == "left" ]]; then
+        _footer_key="$SHELLFRAME_DIFF_VIEW_LEFT_FOOTER"
+        _date_key="$SHELLFRAME_DIFF_VIEW_LEFT_DATE"
+    else
+        _footer_key="$SHELLFRAME_DIFF_VIEW_RIGHT_FOOTER"
+        _date_key="$SHELLFRAME_DIFF_VIEW_RIGHT_DATE"
+    fi
+
+    local _has_footer=0
+    if [[ -n "$_footer_key" ]]; then
+        _has_footer=1
+        _content_h=$(( _height - 1 ))
+        (( _content_h < 1 )) && _content_h=1
+    fi
+
+    _shellframe_dv_render_pane "$_top" "$_left" "$_width" "$_content_h" "$_side"
+
+    # Render footer
+    if (( _has_footer )); then
+        local _footer_row=$(( _top + _height - 1 ))
+        local _reset="${SHELLFRAME_RESET:-}"
+        local _white="${SHELLFRAME_WHITE:-}"
+        local _rev="${SHELLFRAME_REVERSE:-}"
+        local _fbuf="" _ftmp=""
+
+        local _ftext="${_footer_key:0:$(( _width - ${#_date_key} - 3 ))}"
+        printf -v _ftmp '\033[%d;%dH%s%s %s' \
+            "$_footer_row" "$_left" "$_rev" "$_white" "$_ftext"
+        _fbuf+="$_ftmp"
+        local _mid=$(( _width - ${#_ftext} - ${#_date_key} - 2 ))
+        (( _mid < 0 )) && _mid=0
+        printf -v _ftmp '%*s%s %s' "$_mid" "" "$_date_key" "$_reset"
         _fbuf+="$_ftmp"
 
         printf '%s' "$_fbuf" >&3

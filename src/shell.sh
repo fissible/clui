@@ -246,8 +246,21 @@ _shellframe_shell_draw() {
     # Refresh terminal size once per draw (no per-call stty forks)
     _shellframe_shell_refresh_size
 
-    # Fire on_focus using the PREVIOUS cycle's focus ring, so callbacks
-    # can update state (e.g. sidebar width) before regions are re-registered.
+    # Apply any pending focus request to the PREVIOUS cycle's ring
+    # so on_focus sees the correct owner before regions are re-registered.
+    if [[ -n "$_SHELLFRAME_SHELL_FOCUS_REQUEST" ]]; then
+        local _req_name="$_SHELLFRAME_SHELL_FOCUS_REQUEST"
+        _SHELLFRAME_SHELL_FOCUS_REQUEST=""
+        local _ri
+        for _ri in "${!_SHELLFRAME_SHELL_FOCUS_RING[@]}"; do
+            if [[ "${_SHELLFRAME_SHELL_FOCUS_RING[$_ri]}" == "$_req_name" ]]; then
+                _SHELLFRAME_SHELL_FOCUS_IDX=$_ri
+                break
+            fi
+        done
+    fi
+
+    # Fire on_focus using the (now updated) focus ring
     local _focused
     _shellframe_shell_focus_owner _focused
     local _entry _n
