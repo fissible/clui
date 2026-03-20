@@ -185,18 +185,48 @@ shellframe_diff_parse() {
         # Track file status from --- / +++ lines
         [[ "$_line" == "index "* ]] && continue
         if [[ "$_line" == "--- /dev/null" ]]; then
-            # New file — mark the last file as "added"
             local _fi=$(( ${#SHELLFRAME_DIFF_FILE_STATUS[@]} - 1 ))
             (( _fi >= 0 )) && SHELLFRAME_DIFF_FILE_STATUS[$_fi]="added"
             continue
         fi
         if [[ "$_line" == "+++ /dev/null" ]]; then
-            # Deleted file — mark the last file as "deleted"
             local _fi=$(( ${#SHELLFRAME_DIFF_FILE_STATUS[@]} - 1 ))
             (( _fi >= 0 )) && SHELLFRAME_DIFF_FILE_STATUS[$_fi]="deleted"
             continue
         fi
-        [[ "$_line" == "--- "* ]] && continue
+        # Plain diff -u: no "diff --git" header. Use --- line as file header
+        # if we haven't seen a git header for this file yet.
+        if [[ "$_line" == "--- "* ]]; then
+            if (( ${#SHELLFRAME_DIFF_FILES[@]} == 0 )) || (( _hunk_count > 0 )); then
+                # First file or new file — create header from --- line
+                _shellframe_diff_flush_pending
+                _in_hunk=0
+                _hunk_count=0
+                local _fname="${_line#--- }"
+                # Strip leading a/ and trailing tab+timestamp
+                _fname="${_fname#a/}"
+                _fname="${_fname%%$'\t'*}"
+
+                if (( ${#SHELLFRAME_DIFF_FILES[@]} > 0 )); then
+                    SHELLFRAME_DIFF_TYPES+=("file_sep")
+                    SHELLFRAME_DIFF_LEFT+=("")
+                    SHELLFRAME_DIFF_RIGHT+=("")
+                    SHELLFRAME_DIFF_LNUMS+=("")
+                    SHELLFRAME_DIFF_RNUMS+=("")
+                fi
+
+                SHELLFRAME_DIFF_FILES+=("$_fname")
+                SHELLFRAME_DIFF_FILE_ROWS+=("${#SHELLFRAME_DIFF_TYPES[@]}")
+                SHELLFRAME_DIFF_FILE_STATUS+=("modified")
+
+                SHELLFRAME_DIFF_TYPES+=("hdr")
+                SHELLFRAME_DIFF_LEFT+=("$_fname")
+                SHELLFRAME_DIFF_RIGHT+=("$_fname")
+                SHELLFRAME_DIFF_LNUMS+=("")
+                SHELLFRAME_DIFF_RNUMS+=("")
+            fi
+            continue
+        fi
         [[ "$_line" == "+++ "* ]] && continue
 
         # ── Hunk header: @@ -L,C +L,C @@ ─────────────────────────────
