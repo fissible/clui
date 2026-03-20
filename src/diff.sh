@@ -227,7 +227,17 @@ shellframe_diff_parse() {
             fi
             continue
         fi
-        [[ "$_line" == "+++ "* ]] && continue
+        if [[ "$_line" == "+++ "* ]]; then
+            # Update the RIGHT side of the last hdr row with the +++ filename
+            local _rname="${_line#+++ }"
+            _rname="${_rname#b/}"
+            _rname="${_rname%%$'\t'*}"
+            local _last_row=$(( ${#SHELLFRAME_DIFF_RIGHT[@]} - 1 ))
+            if (( _last_row >= 0 )) && [[ "${SHELLFRAME_DIFF_TYPES[$_last_row]}" == "hdr" ]]; then
+                SHELLFRAME_DIFF_RIGHT[$_last_row]="$_rname"
+            fi
+            continue
+        fi
 
         # ── Hunk header: @@ -L,C +L,C @@ ─────────────────────────────
         if [[ "$_line" == "@@"* ]]; then
