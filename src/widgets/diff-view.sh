@@ -241,15 +241,14 @@ shellframe_diff_view_render() {
 
 shellframe_diff_view_on_key() {
     local _key="$1"
-    local _count="${_SHELLFRAME_SHELL_KEY_COUNT:-1}"
 
     case "$_key" in
         "$SHELLFRAME_KEY_UP")
-            shellframe_sync_scroll_move "dv_sync" "dv_left" "up" "$_count"
+            shellframe_sync_scroll_move "dv_sync" "dv_left" "up" 3
             return 0
             ;;
         "$SHELLFRAME_KEY_DOWN")
-            shellframe_sync_scroll_move "dv_sync" "dv_left" "down" "$_count"
+            shellframe_sync_scroll_move "dv_sync" "dv_left" "down" 3
             return 0
             ;;
         "$SHELLFRAME_KEY_PAGE_UP")

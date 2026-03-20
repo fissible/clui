@@ -340,44 +340,15 @@ shellframe_shell() {
                 _shellframe_shell_draw "$_prefix" "$_current"
             fi
 
-            # Read with timeout so SIGWINCH can interrupt the loop
+            # Read with timeout so SIGWINCH can interrupt the loop.
+            # Safety: if fd 3 is dead, bail out instead of spinning.
+            if ! { true >&3; } 2>/dev/null; then
+                _current="__QUIT__"; _screen_done=1; continue
+            fi
+
             local _key=""
             _shellframe_shell_read_key _key
             [[ -z "$_key" ]] && continue   # timeout or resize — loop back
-
-            # Coalesce repeated keys: drain buffered duplicates of the same
-            # key to avoid one-redraw-per-repeat when holding an arrow key.
-            # Store the repeat count in _SHELLFRAME_SHELL_KEY_COUNT.
-            _SHELLFRAME_SHELL_KEY_COUNT=1
-            if [[ "$_key" == "$SHELLFRAME_KEY_UP" || "$_key" == "$SHELLFRAME_KEY_DOWN" \
-               || "$_key" == "$SHELLFRAME_KEY_LEFT" || "$_key" == "$SHELLFRAME_KEY_RIGHT" \
-               || "$_key" == "$SHELLFRAME_KEY_PAGE_UP" || "$_key" == "$SHELLFRAME_KEY_PAGE_DOWN" ]]; then
-                local _peek=""
-                while true; do
-                    _peek=""
-                    IFS= read -r -n1 -d '' -t 0 _peek 2>/dev/null || break
-                    [[ -z "$_peek" ]] && break
-                    # If it starts an escape, read the rest
-                    if [[ "$_peek" == $'\x1b' ]]; then
-                        local _rest=""
-                        IFS= read -r -n1 -d '' -t 0 _rest 2>/dev/null || true
-                        _peek+="$_rest"
-                        if [[ "$_rest" == '[' || "$_rest" == 'O' ]]; then
-                            local _fc=""
-                            while true; do
-                                IFS= read -r -n1 -d '' -t 0 _fc 2>/dev/null || break
-                                _peek+="$_fc"
-                                case "$_fc" in [A-Za-z~]) break ;; esac
-                            done
-                        fi
-                    fi
-                    if [[ "$_peek" == "$_key" ]]; then
-                        (( _SHELLFRAME_SHELL_KEY_COUNT++ ))
-                    else
-                        break  # different key — stop coalescing (key is lost, acceptable)
-                    fi
-                done
-            fi
 
             # Check for resize after read returns
             if (( _SHELLFRAME_SHELL_RESIZED )); then
