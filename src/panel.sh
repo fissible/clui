@@ -182,9 +182,8 @@ shellframe_panel_render() {
         (( _title_pad < 0 )) && _title_pad=0
         local _title_spaces
         printf -v _title_spaces '%*s' "$_title_pad" ''
-        printf '\033[%d;%dH%s%s%s%s%s' \
+        printf '\033[%d;%dH%s%s%s%s' \
             "$_title_row" "$(( _left + _border ))" \
-            "${_on}${_vr}${_off}" \
             "$_title_bg" "$_title_text" "$_title_spaces" "$_title_rst" >&3
         printf '\033[%d;%dH%s' \
             "$_title_row" "$(( _left + _width - 1 ))" \

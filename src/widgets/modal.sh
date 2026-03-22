@@ -211,8 +211,8 @@ shellframe_modal_render() {
     local _save_title="$SHELLFRAME_PANEL_TITLE"
     local _save_talign="$SHELLFRAME_PANEL_TITLE_ALIGN"
     local _save_pfocused="$SHELLFRAME_PANEL_FOCUSED"
-    local _save_pmode="${SHELLFRAME_PANEL_MODE:-framed}"
-    local _save_ptitlebg="${SHELLFRAME_PANEL_TITLE_BG:-}"
+    local _save_pmode="${SHELLFRAME_PANEL_MODE:-framed}"      # pass-through: caller controls windowed mode
+    local _save_ptitlebg="${SHELLFRAME_PANEL_TITLE_BG:-}"     # pass-through: caller controls title bar style
 
     SHELLFRAME_PANEL_STYLE="$_style"
     SHELLFRAME_PANEL_TITLE="${SHELLFRAME_MODAL_TITLE:-}"
