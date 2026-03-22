@@ -177,7 +177,9 @@ _shellframe_modal_dims() {
     # inner rows: 1 (top pad) + n_msg + 1 (gap) + [input: 1+1] + 1 (buttons)
     local _inner_h=$(( 1 + _n_msg + 1 + 1 ))
     (( ${SHELLFRAME_MODAL_INPUT:-0} )) && (( _inner_h += 2 ))
-    local _need_h=$(( _inner_h + 2 ))   # + 2 for border rows
+    local _title_row=0
+    [[ "${SHELLFRAME_PANEL_MODE:-framed}" == "windowed" ]] && _title_row=1
+    local _need_h=$(( _inner_h + 2 + _title_row ))   # + 2 for border rows, + 1 for windowed title bar
     (( _need_h < 7 )) && _need_h=7
 
     local _dim_h="${SHELLFRAME_MODAL_HEIGHT:-0}"
@@ -209,6 +211,8 @@ shellframe_modal_render() {
     local _save_title="$SHELLFRAME_PANEL_TITLE"
     local _save_talign="$SHELLFRAME_PANEL_TITLE_ALIGN"
     local _save_pfocused="$SHELLFRAME_PANEL_FOCUSED"
+    local _save_pmode="${SHELLFRAME_PANEL_MODE:-framed}"
+    local _save_ptitlebg="${SHELLFRAME_PANEL_TITLE_BG:-}"
 
     SHELLFRAME_PANEL_STYLE="$_style"
     SHELLFRAME_PANEL_TITLE="${SHELLFRAME_MODAL_TITLE:-}"
@@ -220,14 +224,18 @@ shellframe_modal_render() {
     SHELLFRAME_PANEL_TITLE="$_save_title"
     SHELLFRAME_PANEL_TITLE_ALIGN="$_save_talign"
     SHELLFRAME_PANEL_FOCUSED="$_save_pfocused"
+    SHELLFRAME_PANEL_MODE="$_save_pmode"
+    SHELLFRAME_PANEL_TITLE_BG="$_save_ptitlebg"
 
     # ── Compute inner content region ──
     local _border=0
     [[ "$_style" != "none" ]] && _border=1
-    local _inner_top=$(( _modal_top  + _border ))
+    local _title_row=0
+    [[ "${SHELLFRAME_PANEL_MODE:-framed}" == "windowed" ]] && _title_row=1
+    local _inner_top=$(( _modal_top  + _border + _title_row ))
     local _inner_left=$(( _modal_left + _border ))
     local _inner_w=$(( _modal_w - _border * 2 ))
-    local _inner_h=$(( _modal_h - _border * 2 ))
+    local _inner_h=$(( _modal_h - _border * 2 - _title_row ))
 
     # Clear inner area
     local _ir
