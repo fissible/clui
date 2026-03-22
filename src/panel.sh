@@ -33,6 +33,8 @@
 #   SHELLFRAME_PANEL_TITLE_ALIGN  — left (default) | center | right
 #   SHELLFRAME_PANEL_FOCUSED      — 0 (default) | 1 (bold border when focused)
 #   SHELLFRAME_PANEL_FOCUSABLE    — 1 (default) | 0 (skip in Tab traversal)
+#   SHELLFRAME_PANEL_MODE         — framed (default) | windowed
+#   SHELLFRAME_PANEL_TITLE_BG     — ANSI bg escape for title bar row (windowed mode only)
 #
 # ── Public API ─────────────────────────────────────────────────────────────────
 #
@@ -61,6 +63,8 @@ SHELLFRAME_PANEL_TITLE=""
 SHELLFRAME_PANEL_TITLE_ALIGN="left"
 SHELLFRAME_PANEL_FOCUSED=0
 SHELLFRAME_PANEL_FOCUSABLE=1
+SHELLFRAME_PANEL_MODE="framed"    # framed (default) | windowed
+SHELLFRAME_PANEL_TITLE_BG=""      # ANSI escape for title bar background (windowed mode only)
 
 # ── Internal: border character sets ───────────────────────────────────────────
 
@@ -189,10 +193,13 @@ shellframe_panel_inner() {
     local _border=0
     [[ "${SHELLFRAME_PANEL_STYLE:-single}" != "none" ]] && _border=1
 
-    printf -v "$_out_top"    '%d' "$(( _top    + _border ))"
+    local _title_row=0
+    [[ "${SHELLFRAME_PANEL_MODE:-framed}" == "windowed" ]] && _title_row=1
+
+    printf -v "$_out_top"    '%d' "$(( _top    + _border + _title_row ))"
     printf -v "$_out_left"   '%d' "$(( _left   + _border ))"
     printf -v "$_out_width"  '%d' "$(( _width  - _border * 2 ))"
-    printf -v "$_out_height" '%d' "$(( _height - _border * 2 ))"
+    printf -v "$_out_height" '%d' "$(( _height - _border * 2 - _title_row ))"
 }
 
 # ── shellframe_panel_on_key ────────────────────────────────────────────────────

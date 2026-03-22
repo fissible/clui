@@ -84,4 +84,50 @@ assert_eq "1" "$?" "on_key returns 1"
 ptyunit_test_begin "panel_size: min 2x2, preferred unconstrained"
 assert_output "2 2 0 0" shellframe_panel_size
 
+# ── shellframe_panel_inner: windowed mode ─────────────────────────────────────
+
+ptyunit_test_begin "panel_inner: windowed+single — top offset by 2"
+SHELLFRAME_PANEL_STYLE="single"
+SHELLFRAME_PANEL_MODE="windowed"
+_ot="" _ol="" _ow="" _oh=""
+shellframe_panel_inner 1 1 20 10 _ot _ol _ow _oh
+assert_eq "3" "$_ot" "windowed+single: inner top = outer top + border(1) + title_row(1)"
+
+ptyunit_test_begin "panel_inner: windowed+single — height reduced by 3"
+SHELLFRAME_PANEL_STYLE="single"
+SHELLFRAME_PANEL_MODE="windowed"
+_ot="" _ol="" _ow="" _oh=""
+shellframe_panel_inner 1 1 20 10 _ot _ol _ow _oh
+assert_eq "7" "$_oh" "windowed+single: inner height = outer height - border*2(2) - title_row(1)"
+
+ptyunit_test_begin "panel_inner: windowed+single — left and width unchanged vs framed"
+SHELLFRAME_PANEL_STYLE="single"
+SHELLFRAME_PANEL_MODE="windowed"
+_ot="" _ol="" _ow="" _oh=""
+shellframe_panel_inner 1 1 20 10 _ot _ol _ow _oh
+assert_eq "2"  "$_ol" "windowed: left still offset by border"
+assert_eq "18" "$_ow" "windowed: width still reduced by border*2"
+
+ptyunit_test_begin "panel_inner: windowed+none — top offset by 1 (title row only)"
+SHELLFRAME_PANEL_STYLE="none"
+SHELLFRAME_PANEL_MODE="windowed"
+_ot="" _ol="" _ow="" _oh=""
+shellframe_panel_inner 1 1 20 10 _ot _ol _ow _oh
+assert_eq "2" "$_ot" "windowed+none: inner top = outer top + title_row(1)"
+
+ptyunit_test_begin "panel_inner: windowed+none — height reduced by 1"
+SHELLFRAME_PANEL_STYLE="none"
+SHELLFRAME_PANEL_MODE="windowed"
+_ot="" _ol="" _ow="" _oh=""
+shellframe_panel_inner 1 1 20 10 _ot _ol _ow _oh
+assert_eq "9" "$_oh" "windowed+none: inner height = outer height - title_row(1)"
+
+ptyunit_test_begin "panel_inner: framed mode unaffected by MODE global"
+SHELLFRAME_PANEL_STYLE="single"
+SHELLFRAME_PANEL_MODE="framed"
+_ot="" _ol="" _ow="" _oh=""
+shellframe_panel_inner 1 1 20 10 _ot _ol _ow _oh
+assert_eq "2" "$_ot" "framed: top offset by border only"
+assert_eq "8" "$_oh" "framed: height reduced by border*2 only"
+
 ptyunit_test_summary
