@@ -108,4 +108,86 @@ ptyunit_test_begin "text_size: three lines, first is longest"
 SHELLFRAME_TEXT_CONTENT=$'hello world\nfoo\nbar'
 assert_output "0 1 11 3" shellframe_text_size
 
+# ── shellframe_text_render: fd 3 output ──────────────────────────────────────
+
+ptyunit_test_begin "text_render: renders content to fd 3"
+SHELLFRAME_TEXT_CONTENT="Hello world"
+SHELLFRAME_TEXT_RENDERED=""
+SHELLFRAME_TEXT_ALIGN="left"
+SHELLFRAME_TEXT_WRAP=0
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_text_render 1 1 40 5
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "Hello world"
+rm -f "$_out"
+
+ptyunit_test_begin "text_render: center-aligned content appears in output"
+SHELLFRAME_TEXT_CONTENT="Centered"
+SHELLFRAME_TEXT_RENDERED=""
+SHELLFRAME_TEXT_ALIGN="center"
+SHELLFRAME_TEXT_WRAP=0
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_text_render 1 1 30 3
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "Centered"
+rm -f "$_out"
+
+ptyunit_test_begin "text_render: right-aligned content appears in output"
+SHELLFRAME_TEXT_CONTENT="Right"
+SHELLFRAME_TEXT_RENDERED=""
+SHELLFRAME_TEXT_ALIGN="right"
+SHELLFRAME_TEXT_WRAP=0
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_text_render 1 1 20 2
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "Right"
+rm -f "$_out"
+
+ptyunit_test_begin "text_render: multi-line content renders each line"
+SHELLFRAME_TEXT_CONTENT=$'Line one\nLine two'
+SHELLFRAME_TEXT_RENDERED=""
+SHELLFRAME_TEXT_ALIGN="left"
+SHELLFRAME_TEXT_WRAP=0
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_text_render 1 1 30 5
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "Line one"
+assert_contains "$_content" "Line two"
+rm -f "$_out"
+
+ptyunit_test_begin "text_render: wrap mode renders wrapped lines"
+SHELLFRAME_TEXT_CONTENT="The quick brown fox"
+SHELLFRAME_TEXT_RENDERED=""
+SHELLFRAME_TEXT_ALIGN="left"
+SHELLFRAME_TEXT_WRAP=1
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_text_render 1 1 10 5
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "The"
+assert_contains "$_content" "quick"
+rm -f "$_out"
+
+ptyunit_test_begin "text_render: ANSI rendered version used when set"
+SHELLFRAME_TEXT_CONTENT="plain"
+SHELLFRAME_TEXT_RENDERED=$'\033[1mplain\033[0m'
+SHELLFRAME_TEXT_ALIGN="left"
+SHELLFRAME_TEXT_WRAP=0
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_text_render 1 1 20 2
+exec 3>&-
+_raw=$(cat "$_out")
+assert_contains "$_raw" $'\033[1m'
+rm -f "$_out"
+
 ptyunit_test_summary
