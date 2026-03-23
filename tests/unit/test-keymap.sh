@@ -7,7 +7,7 @@ SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/keymap.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # ── shellframe_keyname: known key sequences ────────────────────────────────────
 

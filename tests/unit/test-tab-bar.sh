@@ -9,7 +9,7 @@ source "$SHELLFRAME_DIR/src/clip.sh"
 source "$SHELLFRAME_DIR/src/draw.sh"
 source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/widgets/tab-bar.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 SHELLFRAME_TABBAR_LABELS=("Files" "Edit" "View")
 

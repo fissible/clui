@@ -12,7 +12,7 @@ source "$SHELLFRAME_DIR/src/cursor.sh"
 source "$SHELLFRAME_DIR/src/panel.sh"
 source "$SHELLFRAME_DIR/src/widgets/input-field.sh"
 source "$SHELLFRAME_DIR/src/widgets/modal.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

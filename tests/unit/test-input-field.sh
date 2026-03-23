@@ -10,7 +10,7 @@ source "$SHELLFRAME_DIR/src/draw.sh"
 source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/cursor.sh"
 source "$SHELLFRAME_DIR/src/widgets/input-field.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # Helper: reset field to empty state
 _reset_field() {

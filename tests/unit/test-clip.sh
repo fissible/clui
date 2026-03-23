@@ -7,7 +7,7 @@ SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 source "$SHELLFRAME_DIR/src/draw.sh"   # for SHELLFRAME_BOLD, SHELLFRAME_RESET, etc.
 source "$SHELLFRAME_DIR/src/clip.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # ── shellframe_str_len ─────────────────────────────────────────────────────────
 

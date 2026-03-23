@@ -7,7 +7,7 @@ SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 source "$SHELLFRAME_DIR/src/scroll.sh"
 source "$SHELLFRAME_DIR/src/sync-scroll.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # ── Setup helper ─────────────────────────────────────────────────────────────
 

@@ -34,10 +34,14 @@ Read at the start of every session:
 ## Test Runner
 
 ```bash
-bash tests/ptyunit/run.sh          # all tests
-bash tests/ptyunit/run.sh --unit   # unit only
+bash bootstrap.sh              # install ptyunit (first-time setup)
+bash tests/run.sh              # all tests
+bash tests/run.sh --unit       # unit only
 bash tests/docker/run-matrix.sh    # cross-version matrix (bash 3.2, 4.x, 5.x)
 ```
+
+ptyunit is installed via Homebrew (`bash bootstrap.sh`). `PTYUNIT_HOME` defaults to
+`$(brew --prefix ptyunit)/libexec`; set it explicitly to override (e.g. in Docker).
 
 All changes must pass the full matrix before merging to main.
 
@@ -165,7 +169,7 @@ tests/
 
 Run with: `bash tests/docker/run-matrix.sh`
 
-Each container mounts the repo and runs `tests/ptyunit/run.sh`. A failure in any
+Each container mounts the repo and the host ptyunit installation, then runs `tests/run.sh`. A failure in any
 version is a bug. The matrix must pass before merging changes to `src/`.
 
 ## Coding conventions
