@@ -78,6 +78,8 @@ _app3_ROOT_no()      { _SHELLFRAME_APP_NEXT="__QUIT__"; }
 
 shellframe_app "_app3" "ROOT"
 assert_called_times "shellframe_confirm" 1
+# shellframe_alert is not mocked here; mock_call_count returns 0 for
+# unregistered names, so assert_not_called works correctly without a mock.
 assert_not_called "shellframe_alert"
 
 ptyunit_test_summary
