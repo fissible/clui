@@ -61,3 +61,5 @@ assert_eq "1" "$?" "separator returns 1"
 ptyunit_test_begin "mb_parse_sigil: VARNAME validated against [A-Z0-9_]+"
 _shellframe_mb_parse_sigil "@bad-name:Label" _varname _label
 assert_eq "1" "$?" "invalid VARNAME returns 1"
+
+ptyunit_test_summary
