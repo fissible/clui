@@ -308,4 +308,87 @@ assert_output "2" shellframe_sel_cursor "gpk2"
 shellframe_grid_on_key $'\033[H'   # home → cursor = 0
 assert_output "0" shellframe_sel_cursor "gpk2"
 
+# ── shellframe_grid_render: fd 3 output ──────────────────────────────────────
+
+ptyunit_test_begin "grid_render: renders header labels to fd 3"
+_reset_grid
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_grid_render 1 1 50 10
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "Name"
+assert_contains "$_content" "Age"
+rm -f "$_out"
+
+ptyunit_test_begin "grid_render: renders data cell values to fd 3"
+_reset_grid
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_grid_render 1 1 50 10
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "Alice"
+assert_contains "$_content" "Bob"
+rm -f "$_out"
+
+ptyunit_test_begin "grid_render: no headers renders data only (no separator row)"
+SHELLFRAME_GRID_CTX="gnh"
+SHELLFRAME_GRID_ROWS=3
+SHELLFRAME_GRID_COLS=2
+SHELLFRAME_GRID_HEADERS=()
+SHELLFRAME_GRID_COL_WIDTHS=(10 10)
+SHELLFRAME_GRID_DATA=("foo" "bar" "baz" "qux" "one" "two")
+SHELLFRAME_GRID_MULTISELECT=0
+SHELLFRAME_GRID_FOCUSED=0
+shellframe_grid_init "gnh" 5
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_grid_render 1 1 30 5 "gnh"
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "foo"
+rm -f "$_out"
+
+ptyunit_test_begin "grid_render: PK_COLS renders thick separator"
+SHELLFRAME_GRID_CTX="gpkr"
+SHELLFRAME_GRID_ROWS=2
+SHELLFRAME_GRID_COLS=3
+SHELLFRAME_GRID_PK_COLS=1
+SHELLFRAME_GRID_HEADERS=("id" "name" "val")
+SHELLFRAME_GRID_COL_WIDTHS=(5 10 10)
+SHELLFRAME_GRID_DATA=("1" "alpha" "x" "2" "beta" "y")
+SHELLFRAME_GRID_MULTISELECT=0
+SHELLFRAME_GRID_FOCUSED=0
+shellframe_grid_init "gpkr" 5
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_grid_render 1 1 40 6
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "┃"
+rm -f "$_out"
+
+ptyunit_test_begin "grid_render: multiselect shows checkbox prefix"
+_reset_grid
+SHELLFRAME_GRID_MULTISELECT=1
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_grid_render 1 1 60 10
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "[ ]"
+rm -f "$_out"
+
+ptyunit_test_begin "grid_render: h-scroll > 0 skips first column"
+_reset_grid
+shellframe_scroll_move "g" right 1
+_out=$(mktemp)
+exec 3>"$_out"
+shellframe_grid_render 1 1 50 10
+exec 3>&-
+_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+assert_contains "$_content" "Age"
+rm -f "$_out"
+
 ptyunit_test_summary
