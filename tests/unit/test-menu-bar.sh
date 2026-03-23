@@ -174,4 +174,89 @@ shellframe_menubar_on_focus 1
 shellframe_menubar_on_key "x"; _rc=$?
 assert_eq "1" "$_rc" "unrecognised key returns 1"
 
+# ── on_key DROPDOWN state ──────────────────────────────────────────────────────
+
+# Helper: put widget in dropdown state with File menu open
+_open_file_dd() {
+    _reset_mb
+    shellframe_menubar_on_focus 1
+    shellframe_menubar_on_key "$SHELLFRAME_KEY_ENTER"   # → dropdown
+}
+
+ptyunit_test_begin "on_key DROPDOWN: Down moves cursor, skips separator"
+_open_file_dd
+# SHELLFRAME_MENU_FILE=("Open" "Save" "---" "@RECENT:Recent Files" "---" "Quit")
+# cursor starts at 0 (Open); Down → 1 (Save); Down → 3 (skips ---)
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+assert_output "3" shellframe_sel_cursor "mb_mb_dd"
+
+ptyunit_test_begin "on_key DROPDOWN: Up moves cursor, skips separator"
+_open_file_dd
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"  # → 1
+shellframe_menubar_on_key "$SHELLFRAME_KEY_UP"    # → 0
+assert_output "0" shellframe_sel_cursor "mb_mb_dd"
+
+ptyunit_test_begin "on_key DROPDOWN: Enter on leaf → RESULT + rc=2"
+_open_file_dd
+# cursor at 0 = "Open" (leaf), bar=0=File
+shellframe_menubar_on_key "$SHELLFRAME_KEY_ENTER"; _rc=$?
+assert_eq "2" "$_rc" "Enter on leaf returns 2"
+assert_eq "File|Open" "$SHELLFRAME_MENUBAR_RESULT" "RESULT=File|Open"
+
+ptyunit_test_begin "on_key DROPDOWN: Enter on sigil item → submenu state"
+_open_file_dd
+# Move to index 3 = "@RECENT:Recent Files"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_ENTER"
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "submenu" "${!_st_var}" "state=submenu"
+
+ptyunit_test_begin "on_key DROPDOWN: Right on sigil item → submenu state"
+_open_file_dd
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_RIGHT"
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "submenu" "${!_st_var}" "state=submenu via Right"
+
+ptyunit_test_begin "on_key DROPDOWN: Right on leaf → moves to next top-level menu"
+_open_file_dd
+# cursor at 0 (leaf=Open); Right should move to Edit
+shellframe_menubar_on_key "$SHELLFRAME_KEY_RIGHT"
+_idx_var="_SHELLFRAME_MB_mb_BAR_IDX"
+assert_eq "1" "${!_idx_var}" "bar_idx=1 (Edit)"
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "dropdown" "${!_st_var}" "still in dropdown"
+
+ptyunit_test_begin "on_key DROPDOWN: Left moves to previous top-level menu"
+_open_file_dd
+shellframe_menubar_on_key "$SHELLFRAME_KEY_RIGHT"  # File→Edit
+shellframe_menubar_on_key "$SHELLFRAME_KEY_LEFT"   # Edit→File
+_idx_var="_SHELLFRAME_MB_mb_BAR_IDX"
+assert_eq "0" "${!_idx_var}" "bar_idx=0 (File)"
+
+ptyunit_test_begin "on_key DROPDOWN: Left/Right cursor resets to first selectable"
+_open_file_dd
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"  # cursor→1
+shellframe_menubar_on_key "$SHELLFRAME_KEY_RIGHT" # → Edit menu
+assert_output "0" shellframe_sel_cursor "mb_mb_dd"
+
+ptyunit_test_begin "on_key DROPDOWN: Esc → bar state"
+_open_file_dd
+shellframe_menubar_on_key "$SHELLFRAME_KEY_ESC"
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "bar" "${!_st_var}" "state=bar after Esc"
+
+ptyunit_test_begin "on_key DROPDOWN: separator never reached by Down"
+_open_file_dd
+# MENU_FILE: Open(0) Save(1) ---(2) @RECENT(3) ---(4) Quit(5)
+# Down×4 from 0 should land at Quit(5), skipping both ---
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+assert_output "5" shellframe_sel_cursor "mb_mb_dd"
+
 ptyunit_test_summary

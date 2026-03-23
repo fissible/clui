@@ -155,6 +155,43 @@ _shellframe_mb_menu_var() {
     printf -v "$_out" '%s' "SHELLFRAME_MENU_${_uname}"
 }
 
+# ── Internal: open dropdown for a given bar index ──────────────────────────────
+
+# _shellframe_mb_open_dropdown ctx bar_idx
+# Re-initialises the dropdown selection context for the menu at bar_idx.
+# Moves cursor to the first selectable item.
+_shellframe_mb_open_dropdown() {
+    local _ctx="$1" _idx="$2"
+    local _mvar
+    _shellframe_mb_menu_var "$_idx" _mvar
+    local _n_items
+    eval "_n_items=\${#${_mvar}[@]}"
+    shellframe_sel_init "mb_${_ctx}_dd" "$_n_items"
+    local _first=0
+    _shellframe_mb_first_selectable "$_mvar" _first || true
+    local _i
+    for (( _i=0; _i<_first; _i++ )); do
+        shellframe_sel_move "mb_${_ctx}_dd" down
+    done
+}
+
+# ── Internal: skip separators (move cursor past --- items) ────────────────────
+
+# _shellframe_mb_skip_seps ctx sel_ctx arr_var direction
+# Moves the cursor in direction until it lands on a non-separator item.
+_shellframe_mb_skip_seps() {
+    local _ctx="$1" _sel_ctx="$2" _arr_var="$3" _dir="$4"
+    local _n
+    eval "_n=\${#${_arr_var}[@]}"
+    local _max=$(( _n + 1 )) _i=0 _cursor _item
+    while (( _i++ < _max )); do
+        shellframe_sel_cursor "$_sel_ctx" _cursor
+        eval "_item=\"\${${_arr_var}[$_cursor]}\""
+        _shellframe_mb_is_sep "$_item" || break
+        shellframe_sel_move "$_sel_ctx" "$_dir"
+    done
+}
+
 # ── shellframe_menubar_on_key ──────────────────────────────────────────────────
 
 shellframe_menubar_on_key() {
@@ -205,6 +242,75 @@ shellframe_menubar_on_key() {
                     printf -v "$_state_var" '%s' "idle"
                     SHELLFRAME_MENUBAR_FOCUSED=0
                     return 2
+                    ;;
+                *)
+                    return 1
+                    ;;
+            esac
+            ;;
+        dropdown)
+            local _idx="${!_idx_var}"
+            local _mvar
+            _shellframe_mb_menu_var "$_idx" _mvar
+            case "$_key" in
+                "$SHELLFRAME_KEY_DOWN")
+                    shellframe_sel_move "mb_${_ctx}_dd" down
+                    _shellframe_mb_skip_seps "$_ctx" "mb_${_ctx}_dd" "$_mvar" down
+                    return 0
+                    ;;
+                "$SHELLFRAME_KEY_UP")
+                    shellframe_sel_move "mb_${_ctx}_dd" up
+                    _shellframe_mb_skip_seps "$_ctx" "mb_${_ctx}_dd" "$_mvar" up
+                    return 0
+                    ;;
+                "$SHELLFRAME_KEY_RIGHT"|"$SHELLFRAME_KEY_LEFT")
+                    # Check if cursor is on a sigil item AND key is Right
+                    local _cursor _raw_item _vn="" _lbl=""
+                    shellframe_sel_cursor "mb_${_ctx}_dd" _cursor
+                    eval "_raw_item=\"\${${_mvar}[$_cursor]}\""
+                    if [[ "$_key" == "$SHELLFRAME_KEY_RIGHT" ]] && \
+                       _shellframe_mb_parse_sigil "$_raw_item" _vn _lbl 2>/dev/null; then
+                        # Open submenu
+                        local _sm_var="SHELLFRAME_MENU_${_vn}"
+                        local _n_sm=0
+                        eval "_n_sm=\${#${_sm_var}[@]}"
+                        shellframe_sel_init "mb_${_ctx}_sm" "$_n_sm"
+                        printf -v "$_state_var" '%s' "submenu"
+                        return 0
+                    fi
+                    # Move to adjacent top-level menu
+                    if [[ "$_key" == "$SHELLFRAME_KEY_RIGHT" ]]; then
+                        _idx=$(( (_idx + 1) % _n_menus ))
+                    else
+                        _idx=$(( (_idx - 1 + _n_menus) % _n_menus ))
+                    fi
+                    printf -v "$_idx_var" '%d' "$_idx"
+                    _shellframe_mb_open_dropdown "$_ctx" "$_idx"
+                    return 0
+                    ;;
+                "$SHELLFRAME_KEY_ENTER")
+                    local _cursor _raw_item _vn="" _lbl=""
+                    shellframe_sel_cursor "mb_${_ctx}_dd" _cursor
+                    eval "_raw_item=\"\${${_mvar}[$_cursor]}\""
+                    if _shellframe_mb_parse_sigil "$_raw_item" _vn _lbl 2>/dev/null; then
+                        # Open submenu
+                        local _sm_var="SHELLFRAME_MENU_${_vn}"
+                        local _n_sm=0
+                        eval "_n_sm=\${#${_sm_var}[@]}"
+                        shellframe_sel_init "mb_${_ctx}_sm" "$_n_sm"
+                        printf -v "$_state_var" '%s' "submenu"
+                        return 0
+                    fi
+                    # Leaf selection
+                    local _menu_label="${SHELLFRAME_MENU_NAMES[$_idx]}"
+                    SHELLFRAME_MENUBAR_RESULT="${_menu_label}|${_raw_item}"
+                    printf -v "$_state_var" '%s' "idle"
+                    SHELLFRAME_MENUBAR_FOCUSED=0
+                    return 2
+                    ;;
+                "$SHELLFRAME_KEY_ESC")
+                    printf -v "$_state_var" '%s' "bar"
+                    return 0
                     ;;
                 *)
                     return 1
