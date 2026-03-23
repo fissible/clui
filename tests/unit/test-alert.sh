@@ -18,9 +18,8 @@ _render_alert() {
     exec 3>"$_out"
     _shellframe_alert_render "$_title" "$_n_details" "$@"
     exec 3>&-
-    # Strip ANSI escape sequences
+    # Strip ANSI escape sequences (trap handles final cleanup)
     sed 's/\033\[[0-9;]*m//g; s/\033\[[0-9;]*[A-Za-z]//g' "$_out"
-    rm -f "$_out"
 }
 
 # ── Title rendering ──────────────────────────────────────────────────────────

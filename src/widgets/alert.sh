@@ -113,7 +113,8 @@ _shellframe_alert_render() {
 shellframe_alert() {
     local _title="${1:-Done}"
     (( $# > 0 )) && shift
-    local -a _details=("$@")
+    local _details
+    _details=("$@")
     local _n_details=${#_details[@]}
 
     # ── fd plumbing ───────────────────────────────────────────────────────────
