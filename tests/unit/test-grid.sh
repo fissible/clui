@@ -184,7 +184,9 @@ assert_eq "0" "$?" "space returns 0"
 assert_output "1" shellframe_sel_selected_count "g"
 
 ptyunit_test_begin "grid_on_key: space untoggles when multiselect=1"
-# state from previous: item 0 is selected, multiselect=1
+_reset_grid
+SHELLFRAME_GRID_MULTISELECT=1
+shellframe_sel_toggle "g" 0   # pre-select item 0 so untoggle has something to clear
 shellframe_grid_on_key " "
 assert_output "0" shellframe_sel_selected_count "g"
 
