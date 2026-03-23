@@ -34,8 +34,8 @@ shellframe_screen_enter
 shellframe_screen_clear
 shellframe_raw_enter
 
-cols=$(tput cols)
-lines=$(tput lines)
+cols=$(tput cols 2>/dev/null); cols=${cols:-80}
+lines=$(tput lines 2>/dev/null); lines=${lines:-24}
 
 shellframe_diff_view_render 1 1 "$cols" "$(( lines - 1 ))"
 
