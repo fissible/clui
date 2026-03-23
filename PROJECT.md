@@ -228,10 +228,16 @@ _Last updated: 2026-03-16 (session 5)_
 - **M2 milestone achieved**: All Phase 5 mock screens complete (shellql#1–5 all closed).
 - **Next task: Phase 6 — SQLite integration** (shellql#6–8): mock adapter cleanup, `src/db.sh` real adapter, CLI argument parsing (`bin/shql`).
 - **MCP intrusion remediated (2026-03-22)**: A third-party `dual-graph` MCP server overwrote `CLAUDE.md` in both shellframe and shellql repos with its own "Dual-Graph Context Policy", and added `.dual-graph/` to both `.gitignore` files. A prior session reverted the CLAUDE.md replacements and pushed. This session removed `.dual-graph/` directories and `.claude/settings.local.json` hook configs from both repos. All 775 assertions still pass.
-- **Coverage improvement branch `feature/coverage-improvement` (2026-03-22)** [shellframe#21 + plan `docs/superpowers/plans/2026-03-22-coverage-improvement.md`]:
-  - All 3 phases complete: Phase 1 (refactor confirm/action-list/alert to extract `_on_key`/`_render` + unit tests), Phase 2 (new tests for diff-view, app.sh, screen.sh, table), Phase 3 (branch coverage for panel, modal, shell, grid, tab-bar, text).
-  - 917/917 assertions pass on bash 3.2 (local) and bash 5.x (Docker).
-  - Coverage: **58%** (2398/4145 code lines) measured via `bash tests/ptyunit/coverage.sh --src=src` under Docker bash 5. Baseline was 44% on bash 3.2. On bash 3.2, LINENO is dropped at nesting depth ≥3 in PS4 traces, so widget coverage shows 0% locally — always use Docker bash 5 for accurate numbers.
-  - The 70% target in the plan was aspirational; monolithic keyboard event loops in confirm/action-list/table/diff-view (~700 lines) require PTY input and cannot be traced by the coverage tool. Effective coverage of unit-testable code is ~71%.
-  - Branch not yet merged — pending PR + review.
-  - Next: open PR `feature/coverage-improvement → main`, close shellframe#21.
+- **Coverage improvement merged (2026-03-23)** [shellframe#21, PR #25]:
+  - All 3 phases complete and merged to main. 917/917 assertions on bash 3.2 + 5.x.
+  - Coverage: **58%** (2398/4145 code lines) via Docker bash 5. Effective testable-code coverage ~71% (PTY keyboard loops excluded).
+  - HTML reports saved to `coverage/` (gitignored); run `docker run ... bash tests/ptyunit/coverage.sh --src=src --report=html`.
+- **ptyunit submodule → Homebrew tap (2026-03-23)** [PR #26, branch `feature/ptyunit-homebrew`]:
+  - Removed `tests/ptyunit` git submodule and `.gitmodules`.
+  - Added `bootstrap.sh` (`brew install fissible/tap/ptyunit`), `tests/run.sh` wrapper using `PTYUNIT_HOME`.
+  - All 34 test files updated to `source "$PTYUNIT_HOME/assert.sh"` / `PTY_RUN="$PTYUNIT_HOME/pty_run.py"`.
+  - Docker matrix mounts host ptyunit via `-v $PTYUNIT_HOME:/opt/ptyunit -e PTYUNIT_HOME=/opt/ptyunit`.
+  - CI updated: `bootstrap-command: bash bootstrap.sh`, `test-command: bash tests/run.sh`.
+  - **Blocker**: shared CI workflow `fissible/.github/.github/workflows/test-bash.yml` must add `bootstrap-command` input before PR #26 can be merged.
+  - 857/857 unit assertions pass with `PTYUNIT_HOME=/path/to/ptyunit bash tests/run.sh --unit`.
+- **Next task: Phase 6 — SQLite integration** (shellql#6–8): mock adapter cleanup, `src/db.sh` real adapter, CLI argument parsing (`bin/shql`).
