@@ -112,7 +112,224 @@ shellframe_menubar_init() {
     shellframe_sel_init "mb_${_ctx}_dd" 0
     shellframe_sel_init "mb_${_ctx}_sm" 0
 }
-shellframe_menubar_render() { true; }
+# ── Internal: blank a rectangular region ──────────────────────────────────────
+
+_shellframe_mb_blank_region() {
+    local _top="$1" _left="$2" _width="$3" _height="$4"
+    (( _width <= 0 || _height <= 0 )) && return 0
+    local _r _blank
+    printf -v _blank '%*s' "$_width" ''
+    for (( _r=0; _r<_height; _r++ )); do
+        printf '\033[%d;%dH%s' "$(( _top + _r ))" "$_left" "$_blank" >&3
+    done
+}
+
+# ── Internal: compute dropdown dimensions ─────────────────────────────────────
+
+# _shellframe_mb_dd_dims ctx out_w out_h
+# Computes width and height of the dropdown panel for the current bar index.
+_shellframe_mb_dd_dims() {
+    local _ctx="$1" _out_w="$2" _out_h="$3"
+    local _idx_var="_SHELLFRAME_MB_${_ctx}_BAR_IDX"
+    local _mvar
+    _shellframe_mb_menu_var "${!_idx_var}" _mvar
+    local _n
+    eval "_n=\${#${_mvar}[@]}"
+    local _max_len=0 _i _item _lbl _vn
+    for (( _i=0; _i<_n; _i++ )); do
+        eval "_item=\"\${${_mvar}[$_i]}\""
+        if _shellframe_mb_is_sep "$_item"; then
+            _lbl="───────────"
+        elif _shellframe_mb_parse_sigil "$_item" _vn _lbl 2>/dev/null; then
+            _lbl="${_lbl} ▶"
+        else
+            _lbl="$_item"
+        fi
+        (( ${#_lbl} > _max_len )) && _max_len=${#_lbl}
+    done
+    printf -v "$_out_w" '%d' "$(( _max_len + 4 ))"   # 2 border + 2 padding
+    printf -v "$_out_h" '%d' "$(( _n + 2 ))"          # items + top/bottom border
+}
+
+# ── shellframe_menubar_render ──────────────────────────────────────────────────
+
+shellframe_menubar_render() {
+    local _top="$1" _left="$2" _width="$3"
+    local _ctx="${SHELLFRAME_MENUBAR_CTX:-menubar}"
+    local _state_var="_SHELLFRAME_MB_${_ctx}_STATE"
+    local _idx_var="_SHELLFRAME_MB_${_ctx}_BAR_IDX"
+    local _state="${!_state_var}"
+    local _bar_idx="${!_idx_var}"
+
+    local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
+    local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
+    local _act="${SHELLFRAME_MENUBAR_ACTIVE_COLOR:-${SHELLFRAME_BOLD:-$'\033[1m'}}"
+
+    # ── Erase previous overlay panels ─────────────────────────────────────────
+    local _prev_dd_w_var="_SHELLFRAME_MB_${_ctx}_PREV_DD_W"
+    local _prev_dd_h_var="_SHELLFRAME_MB_${_ctx}_PREV_DD_H"
+    local _prev_dd_top_var="_SHELLFRAME_MB_${_ctx}_PREV_DD_TOP"
+    local _prev_dd_left_var="_SHELLFRAME_MB_${_ctx}_PREV_DD_LEFT"
+    if (( ${!_prev_dd_w_var} > 0 )); then
+        _shellframe_mb_blank_region \
+            "${!_prev_dd_top_var}" "${!_prev_dd_left_var}" \
+            "${!_prev_dd_w_var}"   "${!_prev_dd_h_var}"
+        printf -v "_SHELLFRAME_MB_${_ctx}_PREV_DD_W" '%d' 0
+        printf -v "_SHELLFRAME_MB_${_ctx}_PREV_DD_H" '%d' 0
+    fi
+    local _prev_sm_w_var="_SHELLFRAME_MB_${_ctx}_PREV_SM_W"
+    local _prev_sm_h_var="_SHELLFRAME_MB_${_ctx}_PREV_SM_H"
+    local _prev_sm_top_var="_SHELLFRAME_MB_${_ctx}_PREV_SM_TOP"
+    local _prev_sm_left_var="_SHELLFRAME_MB_${_ctx}_PREV_SM_LEFT"
+    if (( ${!_prev_sm_w_var} > 0 )); then
+        _shellframe_mb_blank_region \
+            "${!_prev_sm_top_var}" "${!_prev_sm_left_var}" \
+            "${!_prev_sm_w_var}"   "${!_prev_sm_h_var}"
+        printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_W" '%d' 0
+        printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_H" '%d' 0
+    fi
+
+    # ── Bar row ────────────────────────────────────────────────────────────────
+    printf '\033[%d;%dH' "$_top" "$_left" >&3
+    local _col=0 _i _n_menus="${#SHELLFRAME_MENU_NAMES[@]}"
+    for (( _i=0; _i<_n_menus; _i++ )); do
+        local _lbl=" ${SHELLFRAME_MENU_NAMES[$_i]} "
+        local _llen=${#_lbl}
+        (( _col + _llen > _width )) && break
+        if [[ "$_state" != "idle" && "$_i" == "$_bar_idx" ]]; then
+            printf '%s%s%s' "$_rev" "$_lbl" "$_rst" >&3
+        else
+            printf '%s' "$_lbl" >&3
+        fi
+        (( _col += _llen ))
+    done
+    # Fill remainder
+    local _fill=$(( _width - _col ))
+    (( _fill > 0 )) && printf '%*s' "$_fill" '' >&3
+
+    # ── Dropdown panel ─────────────────────────────────────────────────────────
+    [[ "$_state" == "idle" || "$_state" == "bar" ]] && return 0
+
+    # Compute label_col: sum of label widths up to bar_idx
+    local _label_col=$(( _left ))
+    for (( _i=0; _i<_bar_idx; _i++ )); do
+        (( _label_col += ${#SHELLFRAME_MENU_NAMES[$_i]} + 2 ))
+    done
+    local _dd_top=$(( _top + 1 ))
+    local _dd_w _dd_h
+    _shellframe_mb_dd_dims "$_ctx" _dd_w _dd_h
+
+    # Save for teardown
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_DD_TOP"  '%d' "$_dd_top"
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_DD_LEFT" '%d' "$_label_col"
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_DD_W"    '%d' "$_dd_w"
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_DD_H"    '%d' "$_dd_h"
+
+    # Draw double-border panel
+    local _inner_w=$(( _dd_w - 2 )) _inner_left=$(( _label_col + 1 ))
+    # Top border
+    printf '\033[%d;%dH%s╔' "$_dd_top" "$_label_col" "$_act" >&3
+    local _k; for (( _k=0; _k<_inner_w; _k++ )); do printf '═' >&3; done
+    printf '╗%s' "$_rst" >&3
+
+    # Item rows
+    local _mvar; _shellframe_mb_menu_var "$_bar_idx" _mvar
+    local _n_items; eval "_n_items=\${#${_mvar}[@]}"
+    local _dd_cursor; shellframe_sel_cursor "mb_${_ctx}_dd" _dd_cursor
+    for (( _i=0; _i<_n_items; _i++ )); do
+        local _row=$(( _dd_top + 1 + _i ))
+        local _raw_item; eval "_raw_item=\"\${${_mvar}[$_i]}\""
+        local _display _vn _lbl
+        if _shellframe_mb_is_sep "$_raw_item"; then
+            # Separator row
+            printf '\033[%d;%dH%s║%s' "$_row" "$_label_col" "$_act" "$_rst" >&3
+            local _j; for (( _j=0; _j<_inner_w; _j++ )); do printf '═' >&3; done
+            printf '%s║%s' "$_act" "$_rst" >&3
+            continue
+        elif _shellframe_mb_parse_sigil "$_raw_item" _vn _lbl 2>/dev/null; then
+            _display="${_lbl} ▶"
+        else
+            _display="$_raw_item"
+        fi
+        # Pad/clip display to inner_w - 2 (1 space padding each side)
+        local _cell_w=$(( _inner_w - 2 ))
+        local _padded
+        printf -v _padded '%-*s' "$_cell_w" "$_display"
+        _padded="${_padded:0:$_cell_w}"
+
+        printf '\033[%d;%dH%s║%s' "$_row" "$_label_col" "$_act" "$_rst" >&3
+        if [[ "$_state" == "submenu" && "$_i" == "$_dd_cursor" ]]; then
+            # ▶ item — dimmed when submenu is open
+            printf ' %s%s%s ' "${SHELLFRAME_RESET:-$'\033[0m'}" "$_padded" "${SHELLFRAME_RESET:-$'\033[0m'}" >&3
+        elif [[ "$_state" != "submenu" && "$_i" == "$_dd_cursor" ]]; then
+            # Normal cursor highlight
+            printf ' %s%s%s ' "$_rev" "$_padded" "$_rst" >&3
+        else
+            printf ' %s ' "$_padded" >&3
+        fi
+        printf '%s║%s' "$_act" "$_rst" >&3
+    done
+
+    # Bottom border
+    local _bot=$(( _dd_top + _dd_h - 1 ))
+    printf '\033[%d;%dH%s╚' "$_bot" "$_label_col" "$_act" >&3
+    for (( _k=0; _k<_inner_w; _k++ )); do printf '═' >&3; done
+    printf '╝%s' "$_rst" >&3
+
+    # ── Submenu panel ──────────────────────────────────────────────────────────
+    [[ "$_state" != "submenu" ]] && return 0
+
+    local _raw_dd_item _sm_vn _sm_lbl
+    eval "_raw_dd_item=\"\${${_mvar}[$_dd_cursor]}\""
+    _shellframe_mb_parse_sigil "$_raw_dd_item" _sm_vn _sm_lbl 2>/dev/null || return 0
+    local _sm_var="SHELLFRAME_MENU_${_sm_vn}"
+    local _n_sm; eval "_n_sm=\${#${_sm_var}[@]}"
+
+    # Submenu panel top = dropdown_top + 1 + cursor_item_index
+    local _sm_top=$(( _dd_top + 1 + _dd_cursor ))
+    local _sm_left=$(( _label_col + _dd_w ))
+
+    # Compute submenu width
+    local _sm_max=0
+    for (( _i=0; _i<_n_sm; _i++ )); do
+        local _si; eval "_si=\"\${${_sm_var}[$_i]}\""
+        (( ${#_si} > _sm_max )) && _sm_max=${#_si}
+    done
+    local _sm_w=$(( _sm_max + 4 ))
+    local _sm_h=$(( _n_sm + 2 ))
+    local _sm_inner_w=$(( _sm_w - 2 ))
+
+    # Save for teardown
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_TOP"  '%d' "$_sm_top"
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_LEFT" '%d' "$_sm_left"
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_W"    '%d' "$_sm_w"
+    printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_H"    '%d' "$_sm_h"
+
+    # Top border
+    printf '\033[%d;%dH%s╔' "$_sm_top" "$_sm_left" "$_act" >&3
+    for (( _k=0; _k<_sm_inner_w; _k++ )); do printf '═' >&3; done
+    printf '╗%s' "$_rst" >&3
+
+    local _sm_cursor; shellframe_sel_cursor "mb_${_ctx}_sm" _sm_cursor
+    for (( _i=0; _i<_n_sm; _i++ )); do
+        local _row=$(( _sm_top + 1 + _i ))
+        local _si; eval "_si=\"\${${_sm_var}[$_i]}\""
+        local _cell_w=$(( _sm_inner_w - 2 ))
+        local _padded; printf -v _padded '%-*s' "$_cell_w" "$_si"; _padded="${_padded:0:$_cell_w}"
+        printf '\033[%d;%dH%s║%s' "$_row" "$_sm_left" "$_act" "$_rst" >&3
+        if [[ "$_i" == "$_sm_cursor" ]]; then
+            printf ' %s%s%s ' "$_rev" "$_padded" "$_rst" >&3
+        else
+            printf ' %s ' "$_padded" >&3
+        fi
+        printf '%s║%s' "$_act" "$_rst" >&3
+    done
+
+    local _sm_bot=$(( _sm_top + _sm_h - 1 ))
+    printf '\033[%d;%dH%s╚' "$_sm_bot" "$_sm_left" "$_act" >&3
+    for (( _k=0; _k<_sm_inner_w; _k++ )); do printf '═' >&3; done
+    printf '╝%s' "$_rst" >&3
+}
 
 # ── shellframe_menubar_on_focus ────────────────────────────────────────────────
 
