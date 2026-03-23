@@ -233,5 +233,13 @@ _Last updated: 2026-03-16 (session 5)_
   - 917/917 assertions pass on bash 3.2 (local) and bash 5.x (Docker).
   - Coverage: **58%** (2398/4145 code lines) measured via `bash tests/ptyunit/coverage.sh --src=src` under Docker bash 5. Baseline was 44% on bash 3.2. On bash 3.2, LINENO is dropped at nesting depth ≥3 in PS4 traces, so widget coverage shows 0% locally — always use Docker bash 5 for accurate numbers.
   - The 70% target in the plan was aspirational; monolithic keyboard event loops in confirm/action-list/table/diff-view (~700 lines) require PTY input and cannot be traced by the coverage tool. Effective coverage of unit-testable code is ~71%.
-  - Branch not yet merged — pending PR + review.
-  - Next: open PR `feature/coverage-improvement → main`, close shellframe#21.
+  - Both branches fully merged to `main` (PR #25 coverage improvement, PR #26 ptyunit Homebrew migration).
+  - shellframe#21 can be closed.
+- **ptyunit Homebrew migration complete (2026-03-23)**:
+  - `feature/ptyunit-homebrew` merged as PR #26. Removes `tests/ptyunit/` git submodule; adds `bootstrap.sh` + `tests/run.sh`; all test files updated to `source "$PTYUNIT_HOME/assert.sh"`. Docker matrix mounts host ptyunit via `-v`. CI uses `bootstrap-command: bash bootstrap.sh`.
+  - Worktrees `feature/coverage-improvement` and `feature/ptyunit-homebrew` removed; local branches deleted.
+  - Run tests: `bash tests/run.sh --unit` (no submodule init needed; requires `bash bootstrap.sh` on first use).
+- **diff-view render coverage added (2026-03-23)**:
+  - 23 new assertions in `tests/unit/test-diff-view.sh` covering `_shellframe_dv_clip_ansi`, `_shellframe_dv_render_pane` (all 7 row types + HIDE_FILE_HDR path), `shellframe_diff_view_render` (with/without footer), `shellframe_diff_view_render_side`. `widgets/diff-view.sh`: **11% → 76%**. Total unit assertions: **880/880**. Overall coverage: **64%** (up from 58%).
+  - HTML report: `coverage/2026_03_23_05_19_32.html` (linked from `coverage/index.html`).
+- **`main` is clean**: 880/880 assertions, no dirty worktrees, no stale branches. Next: shellql Phase 6 (SQLite integration, shellql#6–8).
