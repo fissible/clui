@@ -20,6 +20,14 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 1
 fi
 
+# Resolve ptyunit installation to mount into containers (no Homebrew inside Alpine)
+_ptyunit_host=$(brew --prefix ptyunit 2>/dev/null)/libexec
+if [[ ! -f "$_ptyunit_host/run.sh" ]]; then
+    printf 'error: ptyunit not found at %s\n' "$_ptyunit_host" >&2
+    printf 'Run: bash bootstrap.sh\n' >&2
+    exit 1
+fi
+
 # ── Matrix definition ─────────────────────────────────────────────────────────
 
 declare -a _LABELS=("bash 3.2" "bash 4.4" "bash 5.x")
@@ -50,7 +58,11 @@ for _i in "${!_LABELS[@]}"; do
     fi
 
     # Run (--rm cleans up the container; no -t since output is captured)
-    if docker run --rm "$_tag" bash tests/ptyunit/run.sh; then
+    # Mount the host ptyunit installation since Alpine containers have no Homebrew
+    if docker run --rm \
+        -v "$_ptyunit_host:/opt/ptyunit" \
+        -e PTYUNIT_HOME=/opt/ptyunit \
+        "$_tag" bash tests/run.sh; then
         _results+=("$_label: PASS")
         (( _pass++ ))
     else

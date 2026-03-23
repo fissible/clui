@@ -14,9 +14,9 @@
 set -u
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
-PTY_RUN="$TESTS_DIR/ptyunit/pty_run.py"
+PTY_RUN="$PTYUNIT_HOME/pty_run.py"
 
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 _SCREEN_CLEAR=$'\033[H\033[3J\033[2J'
 

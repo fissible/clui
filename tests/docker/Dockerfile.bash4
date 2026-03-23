@@ -16,4 +16,4 @@ RUN ln -sf /usr/local/bin/bash /bin/bash
 
 WORKDIR /shellframe
 COPY . .
-CMD ["bash", "tests/ptyunit/run.sh"]
+CMD ["bash", "tests/run.sh"]

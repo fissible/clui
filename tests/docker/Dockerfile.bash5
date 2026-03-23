@@ -7,4 +7,4 @@ RUN apk add --no-cache bash python3
 
 WORKDIR /shellframe
 COPY . .
-CMD ["bash", "tests/ptyunit/run.sh"]
+CMD ["bash", "tests/run.sh"]

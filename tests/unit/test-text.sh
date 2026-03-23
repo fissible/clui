@@ -7,7 +7,7 @@ SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 source "$SHELLFRAME_DIR/src/clip.sh"
 source "$SHELLFRAME_DIR/src/text.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # ── _shellframe_text_align: left (default) ────────────────────────────────────
 

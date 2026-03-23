@@ -6,7 +6,7 @@ TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
 SHELLFRAME_DIR="$(cd "$TESTS_DIR/.."; pwd)"
 
 source "$SHELLFRAME_DIR/shellframe.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # Render alert to a temp file, strip ANSI, return plain text
 _render_alert() {

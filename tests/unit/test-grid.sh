@@ -11,7 +11,7 @@ source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/selection.sh"
 source "$SHELLFRAME_DIR/src/scroll.sh"
 source "$SHELLFRAME_DIR/src/widgets/grid.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # ── Setup helpers ─────────────────────────────────────────────────────────────
 

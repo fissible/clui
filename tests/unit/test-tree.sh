@@ -11,7 +11,7 @@ source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/selection.sh"
 source "$SHELLFRAME_DIR/src/scroll.sh"
 source "$SHELLFRAME_DIR/src/widgets/tree.sh"
-source "$TESTS_DIR/ptyunit/assert.sh"
+source "$PTYUNIT_HOME/assert.sh"
 
 # ── Test tree: two roots, first has two children, second is a leaf ────────────
 #
