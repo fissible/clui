@@ -82,12 +82,12 @@ _shellframe_mb_parse_sigil() {
     local _rest="${_item:1}"
     # Must contain a colon
     [[ "$_rest" == *:* ]] || return 1
-    local _vn="${_rest%%:*}"
-    local _lbl="${_rest#*:}"
+    local _parsed_vn="${_rest%%:*}"
+    local _parsed_lbl="${_rest#*:}"
     # VARNAME must match [A-Z0-9_]+
-    [[ "$_vn" =~ ^[A-Z0-9_]+$ ]] || return 1
-    printf -v "$_out_vn"  '%s' "$_vn"
-    printf -v "$_out_lbl" '%s' "$_lbl"
+    [[ "$_parsed_vn" =~ ^[A-Z0-9_]+$ ]] || return 1
+    printf -v "$_out_vn"  '%s' "$_parsed_vn"
+    printf -v "$_out_lbl" '%s' "$_parsed_lbl"
     return 0
 }
 
@@ -105,6 +105,9 @@ shellframe_menubar_init() {
     printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_LEFT" '%d' 0
     printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_W"    '%d' 0
     printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_H"    '%d' 0
+    # Submenu state: variable name and label of the currently open submenu item
+    printf -v "_SHELLFRAME_MB_${_ctx}_SM_VN"  '%s' ""
+    printf -v "_SHELLFRAME_MB_${_ctx}_SM_LBL" '%s' ""
     # Selection contexts for dropdown and submenu cursors
     shellframe_sel_init "mb_${_ctx}_dd" 0
     shellframe_sel_init "mb_${_ctx}_sm" 0
@@ -275,6 +278,8 @@ shellframe_menubar_on_key() {
                         local _n_sm=0
                         eval "_n_sm=\${#${_sm_var}[@]}"
                         shellframe_sel_init "mb_${_ctx}_sm" "$_n_sm"
+                        printf -v "_SHELLFRAME_MB_${_ctx}_SM_VN"  '%s' "$_vn"
+                        printf -v "_SHELLFRAME_MB_${_ctx}_SM_LBL" '%s' "$_lbl"
                         printf -v "$_state_var" '%s' "submenu"
                         return 0
                     fi
@@ -298,6 +303,8 @@ shellframe_menubar_on_key() {
                         local _n_sm=0
                         eval "_n_sm=\${#${_sm_var}[@]}"
                         shellframe_sel_init "mb_${_ctx}_sm" "$_n_sm"
+                        printf -v "_SHELLFRAME_MB_${_ctx}_SM_VN"  '%s' "$_vn"
+                        printf -v "_SHELLFRAME_MB_${_ctx}_SM_LBL" '%s' "$_lbl"
                         printf -v "$_state_var" '%s' "submenu"
                         return 0
                     fi
@@ -317,9 +324,62 @@ shellframe_menubar_on_key() {
                     ;;
             esac
             ;;
+        submenu)
+            local _idx="${!_idx_var}"
+            local _vn_var="_SHELLFRAME_MB_${_ctx}_SM_VN"
+            local _lbl_var="_SHELLFRAME_MB_${_ctx}_SM_LBL"
+            local _vn="${!_vn_var}"
+            local _lbl="${!_lbl_var}"
+            local _sm_var="SHELLFRAME_MENU_${_vn}"
+
+            case "$_key" in
+                "$SHELLFRAME_KEY_DOWN")
+                    shellframe_sel_move "mb_${_ctx}_sm" down
+                    return 0
+                    ;;
+                "$SHELLFRAME_KEY_UP")
+                    shellframe_sel_move "mb_${_ctx}_sm" up
+                    return 0
+                    ;;
+                "$SHELLFRAME_KEY_ENTER")
+                    local _sm_cursor _sm_item
+                    shellframe_sel_cursor "mb_${_ctx}_sm" _sm_cursor
+                    eval "_sm_item=\"\${${_sm_var}[$_sm_cursor]}\""
+                    local _menu_label="${SHELLFRAME_MENU_NAMES[$_idx]}"
+                    SHELLFRAME_MENUBAR_RESULT="${_menu_label}|${_lbl}|${_sm_item}"
+                    printf -v "$_state_var" '%s' "idle"
+                    SHELLFRAME_MENUBAR_FOCUSED=0
+                    return 2
+                    ;;
+                "$SHELLFRAME_KEY_LEFT"|"$SHELLFRAME_KEY_ESC")
+                    printf -v "$_state_var" '%s' "dropdown"
+                    return 0
+                    ;;
+                *)
+                    return 1
+                    ;;
+            esac
+            ;;
     esac
     return 1
 }
 
-shellframe_menubar_size()   { printf '%d %d %d %d' 1 1 0 1; }
-shellframe_menubar_open()   { return 1; }
+shellframe_menubar_size() { printf '%d %d %d %d' 1 1 0 1; }
+
+shellframe_menubar_open() {
+    local _name="$1"
+    local _ctx="${SHELLFRAME_MENUBAR_CTX:-menubar}"
+    local _n="${#SHELLFRAME_MENU_NAMES[@]}" _i
+    for (( _i=0; _i<_n; _i++ )); do
+        if [[ "${SHELLFRAME_MENU_NAMES[$_i]}" == "$_name" ]]; then
+            shellframe_menubar_on_focus 1
+            local _idx_var="_SHELLFRAME_MB_${_ctx}_BAR_IDX"
+            local _state_var="_SHELLFRAME_MB_${_ctx}_STATE"
+            printf -v "$_idx_var" '%d' "$_i"
+            _shellframe_mb_open_dropdown "$_ctx" "$_i"
+            printf -v "$_state_var" '%s' "dropdown"
+            return 0
+        fi
+    done
+    return 1
+}

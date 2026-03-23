@@ -259,4 +259,71 @@ shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
 shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
 assert_output "5" shellframe_sel_cursor "mb_mb_dd"
 
+# ── on_key SUBMENU state ───────────────────────────────────────────────────────
+
+# Helper: put widget in submenu state (File → Recent Files)
+_open_submenu() {
+    _open_file_dd
+    shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"   # → Save(1)
+    shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"   # → @RECENT(3)
+    shellframe_menubar_on_key "$SHELLFRAME_KEY_ENTER"  # → submenu
+}
+
+ptyunit_test_begin "on_key SUBMENU: Down moves submenu cursor"
+_open_submenu
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"
+assert_output "1" shellframe_sel_cursor "mb_mb_sm"
+
+ptyunit_test_begin "on_key SUBMENU: Enter → RESULT with full path, rc=2"
+_open_submenu
+shellframe_menubar_on_key "$SHELLFRAME_KEY_ENTER"; _rc=$?
+assert_eq "2" "$_rc" "Enter returns 2"
+assert_eq "File|Recent Files|demo.db" "$SHELLFRAME_MENUBAR_RESULT" "full path RESULT"
+
+ptyunit_test_begin "on_key SUBMENU: Enter on item 1 → correct RESULT"
+_open_submenu
+shellframe_menubar_on_key "$SHELLFRAME_KEY_DOWN"   # → work.db
+shellframe_menubar_on_key "$SHELLFRAME_KEY_ENTER"; _rc=$?
+assert_eq "File|Recent Files|work.db" "$SHELLFRAME_MENUBAR_RESULT" "RESULT=work.db"
+
+ptyunit_test_begin "on_key SUBMENU: Esc → dropdown, cursor restored to ▶ item"
+_open_submenu
+shellframe_menubar_on_key "$SHELLFRAME_KEY_ESC"
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "dropdown" "${!_st_var}" "state=dropdown"
+assert_output "3" shellframe_sel_cursor "mb_mb_dd"
+
+ptyunit_test_begin "on_key SUBMENU: Left → dropdown, cursor restored to ▶ item"
+_open_submenu
+shellframe_menubar_on_key "$SHELLFRAME_KEY_LEFT"
+assert_output "3" shellframe_sel_cursor "mb_mb_dd"
+
+ptyunit_test_begin "on_key SUBMENU: on_focus 0 → idle"
+_open_submenu
+shellframe_menubar_on_focus 0
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "idle" "${!_st_var}" "state=idle"
+
+# ── shellframe_menubar_open ────────────────────────────────────────────────────
+
+ptyunit_test_begin "menubar_open: opens named menu, state=dropdown"
+_reset_mb
+shellframe_menubar_open "Edit"
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "dropdown" "${!_st_var}" "state=dropdown"
+_idx_var="_SHELLFRAME_MB_mb_BAR_IDX"
+assert_eq "1" "${!_idx_var}" "bar_idx=1 (Edit)"
+
+ptyunit_test_begin "menubar_open: sets FOCUSED=1"
+_reset_mb
+shellframe_menubar_open "File"
+assert_eq "1" "$SHELLFRAME_MENUBAR_FOCUSED" "FOCUSED=1"
+
+ptyunit_test_begin "menubar_open: unknown name returns 1, no state change"
+_reset_mb
+shellframe_menubar_open "Nonexistent"; _rc=$?
+_st_var="_SHELLFRAME_MB_mb_STATE"
+assert_eq "1" "$_rc" "unknown name returns 1"
+assert_eq "idle" "${!_st_var}" "state unchanged (idle)"
+
 ptyunit_test_summary
