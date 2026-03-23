@@ -63,7 +63,7 @@ _shellframe_action_list_on_key() {
         return 0
     elif [[ "$_key" == "$SHELLFRAME_KEY_RIGHT" || "$_key" == "$SHELLFRAME_KEY_SPACE" ]]; then
         local -a _cur_acts
-        IFS=' ' read -r -a _cur_acts <<< "${SHELLFRAME_AL_ACTIONS[$SHELLFRAME_AL_SELECTED]}"
+        IFS=' ' read -r -a _cur_acts < <(printf '%s\n' "${SHELLFRAME_AL_ACTIONS[$SHELLFRAME_AL_SELECTED]}")
         SHELLFRAME_AL_IDX[$SHELLFRAME_AL_SELECTED]=$(( (SHELLFRAME_AL_IDX[$SHELLFRAME_AL_SELECTED] + 1) % ${#_cur_acts[@]} ))
         return 0
     elif [[ "$_key" == "$SHELLFRAME_KEY_ENTER" || "$_key" == 'c' || "$_key" == 'C' ]]; then
@@ -200,7 +200,8 @@ shellframe_action_list() {
             elif (( _xrc == 1 )); then
                 continue
             fi
-            _dirty=2
+            _dirty=2   # _xrc == 0: handled — conservative full redraw (caller may have
+                       # re-entered via shellframe_screen_enter after a sub-TUI)
         else
             continue
         fi

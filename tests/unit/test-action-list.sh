@@ -40,6 +40,7 @@ ptyunit_test_begin "al_on_key: Up clamps at row 0"
 _reset_al
 SHELLFRAME_AL_SELECTED=0
 _shellframe_action_list_on_key "$SHELLFRAME_KEY_UP" 3
+assert_eq "0" "$?" "returns 0 (dirty)"
 assert_eq "0" "$SHELLFRAME_AL_SELECTED" "clamped at 0"
 
 # ── Action cycling ──────────────────────────────────────────────────────────
@@ -75,6 +76,11 @@ ptyunit_test_begin "al_on_key: c returns 2 (confirm)"
 _reset_al
 _shellframe_action_list_on_key "c" 3
 assert_eq "2" "$?" "c returns 2"
+
+ptyunit_test_begin "al_on_key: C returns 2 (confirm)"
+_reset_al
+_shellframe_action_list_on_key "C" 3
+assert_eq "2" "$?" "C returns 2"
 
 ptyunit_test_begin "al_on_key: q returns 3 (quit)"
 _reset_al
