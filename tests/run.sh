@@ -9,11 +9,16 @@
 set -u
 
 if [[ -z "${PTYUNIT_HOME:-}" ]]; then
-    _prefix=$(brew --prefix ptyunit 2>/dev/null) || {
+    # Check for sibling ptyunit checkout (used in CI and local fissible workspace)
+    _sibling="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/ptyunit"
+    if [[ -f "$_sibling/run.sh" ]]; then
+        PTYUNIT_HOME="$_sibling"
+    elif _prefix=$(brew --prefix ptyunit 2>/dev/null); then
+        PTYUNIT_HOME="$_prefix/libexec"
+    else
         printf 'error: ptyunit not found. Run: bash bootstrap.sh\n' >&2
         exit 1
-    }
-    PTYUNIT_HOME="$_prefix/libexec"
+    fi
 fi
 
 if [[ ! -f "$PTYUNIT_HOME/run.sh" ]]; then
