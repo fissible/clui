@@ -44,6 +44,7 @@ SHELLFRAME_LIST_CTX="list"
 SHELLFRAME_LIST_MULTISELECT=0
 SHELLFRAME_LIST_FOCUSED=0
 SHELLFRAME_LIST_FOCUSABLE=1
+SHELLFRAME_LIST_CURSOR_STYLE=""
 SHELLFRAME_LIST_ITEMS=()
 
 # ── shellframe_list_init ─────────────────────────────────────────────────────
@@ -106,9 +107,11 @@ shellframe_list_render() {
         printf '\033[%d;%dH' "$_row" "$_left" >&3
 
         if (( _item_idx == _cursor )); then
-            # Highlight cursor row: reverse when focused, dim bg when not
+            # Highlight cursor row: custom style, reverse, or dim bg
             local _hl
-            if (( _focused )); then
+            if [[ -n "${SHELLFRAME_LIST_CURSOR_STYLE:-}" ]] && (( _focused )); then
+                _hl="$SHELLFRAME_LIST_CURSOR_STYLE"
+            elif (( _focused )); then
                 _hl="$_rev"
             else
                 # Dark gray background (236) with normal text — subtle indicator

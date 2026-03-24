@@ -242,6 +242,8 @@ shellframe_grid_render() {
     shellframe_scroll_resize "$_ctx" "$_data_height" "$_trailing_vis_cols"
 
     local _grid_bg="${SHELLFRAME_GRID_BG:-}"
+    # Reset that preserves grid background (used after colored separators)
+    local _bg_rst="${_rst}${_grid_bg}"
 
     # ── Header label row ──────────────────────────────────────────────────────
     if (( _has_header )); then
@@ -260,21 +262,21 @@ shellframe_grid_render() {
             (( _avail <= 0 )) && continue
             local _clipped
             _clipped=$(shellframe_str_clip_ellipsis "$_hdr" \
-                "${_bold}${_white}${_hdr}${_rst}" "$_avail")
+                "${_bold}${_white}${_hdr}${_bg_rst}" "$_avail")
             printf '\033[%d;%dH%s' "$_top" "$(( _left + _pad_xoff ))" "$_clipped" >&3
 
             # Separator after this header
             if (( _vi < _n_vis_seps )); then
                 printf '\033[%d;%dH%s%s%s' \
                     "$_top" "$(( _left + ${_vis_sep_x[$_vi]} ))" \
-                    "$_gray" "${_vis_sep_char[$_vi]}" "$_rst" >&3
+                    "$_gray" "${_vis_sep_char[$_vi]}" "$_bg_rst" >&3
             fi
         done
 
         # Right end-of-data border in header label row
         if (( _right_border_x >= 0 )); then
             printf '\033[%d;%dH%s│%s' \
-                "$_top" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >&3
+                "$_top" "$(( _left + _right_border_x ))" "$_gray" "$_bg_rst" >&3
         fi
 
         # ── Header separator row: ─── with ┼/╋ at column separator positions ──
@@ -293,7 +295,7 @@ shellframe_grid_render() {
         local _bdi
         for (( _bdi=_prev_x; _bdi<_dash_end; _bdi++ )); do printf '─' >&3; done
         if (( _right_border_x >= 0 )); then printf '┘' >&3; fi
-        printf '%s' "$_rst" >&3
+        printf '%s' "$_bg_rst" >&3
     fi
 
     # ── Data rows ─────────────────────────────────────────────────────────────
@@ -399,7 +401,7 @@ shellframe_grid_render() {
                 else
                     printf '\033[%d;%dH%s%s%s' \
                         "$_row" "$(( _left + _sxoff ))" \
-                        "$_gray" "$_schar" "$_rst" >&3
+                        "$_gray" "$_schar" "$_bg_rst" >&3
                 fi
             fi
         done
@@ -409,7 +411,7 @@ shellframe_grid_render() {
         # Right end-of-data border in data row (only for rows that have data)
         if (( _right_border_x >= 0 && _ridx < _nrows )); then
             printf '\033[%d;%dH%s│%s' \
-                "$_row" "$(( _left + _right_border_x ))" "$_gray" "$_rst" >&3
+                "$_row" "$(( _left + _right_border_x ))" "$_gray" "$_bg_rst" >&3
         fi
     done
 
