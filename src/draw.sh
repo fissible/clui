@@ -27,6 +27,7 @@ shellframe_pad_left() {
 # ── Color constants ───────────────────────────────────────────────────────────
 
 SHELLFRAME_BOLD=$(tput bold     2>/dev/null || true)
+SHELLFRAME_DIM=$(tput dim       2>/dev/null || true)
 SHELLFRAME_RESET=$(tput sgr0    2>/dev/null || true)
 SHELLFRAME_REVERSE=$(tput rev   2>/dev/null || true)
 SHELLFRAME_GREEN=$(tput setaf 2 2>/dev/null || true)
