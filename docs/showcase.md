@@ -442,3 +442,47 @@ shellframe_shell "_demo" "ROOT"
 
 See [`docs/skeletons.md`](skeletons.md) for copy-paste starting points for
 each of the patterns above.
+
+## Menu bar
+
+Horizontal menu bar with dropdowns and one level of submenu nesting.
+
+```
+ File  Edit  View
+╔══════════════════╗
+║ Open             ║
+║ Save             ║
+║ ════════════════ ║
+║ Recent Files    ▶║╔══════════════╗
+║ ════════════════ ║║ demo.db      ║
+║ Quit             ║║ work.db      ║
+╚══════════════════╝║ archive.db   ║
+                    ╚══════════════╝
+```
+
+```bash
+source shellframe.sh
+
+SHELLFRAME_MENU_NAMES=("File" "Edit" "View")
+SHELLFRAME_MENU_FILE=("Open" "Save" "---" "@RECENT:Recent Files" "---" "Quit")
+SHELLFRAME_MENU_RECENT=("demo.db" "work.db" "archive.db")
+
+SHELLFRAME_MENUBAR_CTX="demo"
+shellframe_menubar_init "demo"
+shellframe_menubar_on_focus 1
+
+exec 3>/dev/tty
+while true; do
+    shellframe_menubar_render 1 1 "$cols" "$rows"
+    shellframe_read_key key
+    shellframe_menubar_on_key "$key"
+    (( $? == 2 )) && break
+done
+
+printf 'Selected: %s\n' "$SHELLFRAME_MENUBAR_RESULT"
+```
+
+**Data model:** `SHELLFRAME_MENU_<NAME>` arrays hold items. `---` = separator.
+`@VARNAME:Label` declares a submenu backed by `SHELLFRAME_MENU_VARNAME`.
+Result path in `SHELLFRAME_MENUBAR_RESULT` (e.g. `File|Recent Files|demo.db`).
+Empty result = dismissed with Esc.
