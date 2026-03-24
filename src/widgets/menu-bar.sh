@@ -154,7 +154,7 @@ _shellframe_mb_dd_dims() {
 # ── shellframe_menubar_render ──────────────────────────────────────────────────
 
 shellframe_menubar_render() {
-    local _top="$1" _left="$2" _width="$3"
+    local _top="$1" _left="$2" _width="$3" _height="$4"
     local _ctx="${SHELLFRAME_MENUBAR_CTX:-menubar}"
     local _state_var="_SHELLFRAME_MB_${_ctx}_STATE"
     local _idx_var="_SHELLFRAME_MB_${_ctx}_BAR_IDX"
@@ -372,6 +372,8 @@ _shellframe_mb_menu_var() {
     # uppercase, spaces → underscores
     local _uname
     _uname=$(printf '%s' "$_label" | tr '[:lower:]' '[:upper:]' | tr ' ' '_')
+    # Validate against [A-Z0-9_]+ before use in eval
+    [[ "$_uname" =~ ^[A-Z0-9_]+$ ]] || { printf -v "$_out" '%s' ""; return 1; }
     printf -v "$_out" '%s' "SHELLFRAME_MENU_${_uname}"
 }
 
@@ -421,6 +423,7 @@ shellframe_menubar_on_key() {
     local _idx_var="_SHELLFRAME_MB_${_ctx}_BAR_IDX"
     local _state="${!_state_var}"
     local _n_menus="${#SHELLFRAME_MENU_NAMES[@]}"
+    (( _n_menus == 0 )) && return 1
 
     case "$_state" in
         idle)
@@ -441,19 +444,7 @@ shellframe_menubar_on_key() {
                     return 0
                     ;;
                 "$SHELLFRAME_KEY_ENTER"|"$SHELLFRAME_KEY_DOWN")
-                    # Open dropdown: init sel context for current menu
-                    local _mvar
-                    _shellframe_mb_menu_var "${!_idx_var}" _mvar
-                    local _n_items
-                    eval "_n_items=\${#${_mvar}[@]}"
-                    shellframe_sel_init "mb_${_ctx}_dd" "$_n_items"
-                    local _first
-                    _shellframe_mb_first_selectable "$_mvar" _first
-                    # Move cursor to first selectable
-                    local _i
-                    for (( _i=0; _i<_first; _i++ )); do
-                        shellframe_sel_move "mb_${_ctx}_dd" down
-                    done
+                    _shellframe_mb_open_dropdown "$_ctx" "${!_idx_var}"
                     printf -v "$_state_var" '%s' "dropdown"
                     return 0
                     ;;
