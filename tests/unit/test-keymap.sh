@@ -194,4 +194,80 @@ assert_output "confirm" shellframe_keymap_lookup "edit" "$SHELLFRAME_KEY_ENTER"
 ptyunit_test_begin "default_edit: esc → cancel"
 assert_output "cancel" shellframe_keymap_lookup "edit" "$SHELLFRAME_KEY_ESC"
 
+# ── shellframe_keyname: F1–F12 ────────────────────────────────────────────────
+
+ptyunit_test_begin "keyname: f1"
+assert_output "f1" shellframe_keyname "$SHELLFRAME_KEY_F1"
+
+ptyunit_test_begin "keyname: f2"
+assert_output "f2" shellframe_keyname "$SHELLFRAME_KEY_F2"
+
+ptyunit_test_begin "keyname: f3"
+assert_output "f3" shellframe_keyname "$SHELLFRAME_KEY_F3"
+
+ptyunit_test_begin "keyname: f4"
+assert_output "f4" shellframe_keyname "$SHELLFRAME_KEY_F4"
+
+ptyunit_test_begin "keyname: f5"
+assert_output "f5" shellframe_keyname "$SHELLFRAME_KEY_F5"
+
+ptyunit_test_begin "keyname: f6"
+assert_output "f6" shellframe_keyname "$SHELLFRAME_KEY_F6"
+
+ptyunit_test_begin "keyname: f7"
+assert_output "f7" shellframe_keyname "$SHELLFRAME_KEY_F7"
+
+ptyunit_test_begin "keyname: f8"
+assert_output "f8" shellframe_keyname "$SHELLFRAME_KEY_F8"
+
+ptyunit_test_begin "keyname: f9"
+assert_output "f9" shellframe_keyname "$SHELLFRAME_KEY_F9"
+
+ptyunit_test_begin "keyname: f10"
+assert_output "f10" shellframe_keyname "$SHELLFRAME_KEY_F10"
+
+ptyunit_test_begin "keyname: f11"
+assert_output "f11" shellframe_keyname "$SHELLFRAME_KEY_F11"
+
+ptyunit_test_begin "keyname: f12"
+assert_output "f12" shellframe_keyname "$SHELLFRAME_KEY_F12"
+
+# ── shellframe_keyname: modifier+arrow ────────────────────────────────────────
+
+ptyunit_test_begin "keyname: shift_up"
+assert_output "shift_up" shellframe_keyname "$SHELLFRAME_KEY_SHIFT_UP"
+
+ptyunit_test_begin "keyname: shift_down"
+assert_output "shift_down" shellframe_keyname "$SHELLFRAME_KEY_SHIFT_DOWN"
+
+ptyunit_test_begin "keyname: shift_right"
+assert_output "shift_right" shellframe_keyname "$SHELLFRAME_KEY_SHIFT_RIGHT"
+
+ptyunit_test_begin "keyname: shift_left"
+assert_output "shift_left" shellframe_keyname "$SHELLFRAME_KEY_SHIFT_LEFT"
+
+ptyunit_test_begin "keyname: alt_up"
+assert_output "alt_up" shellframe_keyname "$SHELLFRAME_KEY_ALT_UP"
+
+ptyunit_test_begin "keyname: alt_down"
+assert_output "alt_down" shellframe_keyname "$SHELLFRAME_KEY_ALT_DOWN"
+
+ptyunit_test_begin "keyname: alt_right"
+assert_output "alt_right" shellframe_keyname "$SHELLFRAME_KEY_ALT_RIGHT"
+
+ptyunit_test_begin "keyname: alt_left"
+assert_output "alt_left" shellframe_keyname "$SHELLFRAME_KEY_ALT_LEFT"
+
+ptyunit_test_begin "keyname: ctrl_up"
+assert_output "ctrl_up" shellframe_keyname "$SHELLFRAME_KEY_CTRL_UP"
+
+ptyunit_test_begin "keyname: ctrl_down"
+assert_output "ctrl_down" shellframe_keyname "$SHELLFRAME_KEY_CTRL_DOWN"
+
+ptyunit_test_begin "keyname: ctrl_right"
+assert_output "ctrl_right" shellframe_keyname "$SHELLFRAME_KEY_CTRL_RIGHT"
+
+ptyunit_test_begin "keyname: ctrl_left"
+assert_output "ctrl_left" shellframe_keyname "$SHELLFRAME_KEY_CTRL_LEFT"
+
 ptyunit_test_summary

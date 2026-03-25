@@ -26,6 +26,10 @@
 #       up  down  left  right  enter  tab  shift_tab  space  esc
 #       backspace  delete  home  end  page_up  page_down
 #       ctrl_a  ctrl_e  ctrl_k  ctrl_u  ctrl_w
+#       f1  f2  f3  f4  f5  f6  f7  f8  f9  f10  f11  f12
+#       shift_up  shift_down  shift_right  shift_left
+#       alt_up  alt_down  alt_right  alt_left
+#       ctrl_up  ctrl_down  ctrl_right  ctrl_left
 #       <single char>  — for printable ASCII or any unrecognised single byte
 #
 # ── Layer 2: Named keymaps ────────────────────────────────────────────────────
@@ -106,6 +110,35 @@ shellframe_keyname() {
     elif [[ "$_key" == "$SHELLFRAME_KEY_CTRL_K"    ]]; then _name="ctrl_k"
     elif [[ "$_key" == "$SHELLFRAME_KEY_CTRL_U"    ]]; then _name="ctrl_u"
     elif [[ "$_key" == "$SHELLFRAME_KEY_CTRL_W"    ]]; then _name="ctrl_w"
+    # Function keys F1–F4 (SS3 sequences)
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F1"        ]]; then _name="f1"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F2"        ]]; then _name="f2"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F3"        ]]; then _name="f3"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F4"        ]]; then _name="f4"
+    # Function keys F5–F12 (CSI sequences)
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F5"        ]]; then _name="f5"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F6"        ]]; then _name="f6"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F7"        ]]; then _name="f7"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F8"        ]]; then _name="f8"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F9"        ]]; then _name="f9"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F10"       ]]; then _name="f10"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F11"       ]]; then _name="f11"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_F12"       ]]; then _name="f12"
+    # Modifier+arrow: Shift
+    elif [[ "$_key" == "$SHELLFRAME_KEY_SHIFT_UP"  ]]; then _name="shift_up"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_SHIFT_DOWN" ]]; then _name="shift_down"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_SHIFT_RIGHT" ]]; then _name="shift_right"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_SHIFT_LEFT" ]]; then _name="shift_left"
+    # Modifier+arrow: Alt
+    elif [[ "$_key" == "$SHELLFRAME_KEY_ALT_UP"    ]]; then _name="alt_up"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_ALT_DOWN"  ]]; then _name="alt_down"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_ALT_RIGHT" ]]; then _name="alt_right"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_ALT_LEFT"  ]]; then _name="alt_left"
+    # Modifier+arrow: Ctrl
+    elif [[ "$_key" == "$SHELLFRAME_KEY_CTRL_UP"   ]]; then _name="ctrl_up"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_CTRL_DOWN" ]]; then _name="ctrl_down"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_CTRL_RIGHT" ]]; then _name="ctrl_right"
+    elif [[ "$_key" == "$SHELLFRAME_KEY_CTRL_LEFT" ]]; then _name="ctrl_left"
     elif [[ ${#_key} -eq 1 ]]; then
         # Single character: return as-is (printable chars and unrecognised
         # single-byte control chars).

@@ -64,6 +64,35 @@ SHELLFRAME_KEY_PAGE_DOWN=$'\x1b[6~'
 # Bracketed paste mode sequences (6-byte): enabled by shellframe_raw_enter
 SHELLFRAME_KEY_PASTE_START=$'\x1b[200~'
 SHELLFRAME_KEY_PASTE_END=$'\x1b[201~'
+# Function keys F1–F4: SS3 sequences (ESC O P–S)
+SHELLFRAME_KEY_F1=$'\x1bOP'
+SHELLFRAME_KEY_F2=$'\x1bOQ'
+SHELLFRAME_KEY_F3=$'\x1bOR'
+SHELLFRAME_KEY_F4=$'\x1bOS'
+# Function keys F5–F12: CSI sequences (ESC [ <num> ~)
+# Note: F6=17, F7=18, F8=19, F9=20, F10=21 (F11 skips to 23, F12=24)
+SHELLFRAME_KEY_F5=$'\x1b[15~'
+SHELLFRAME_KEY_F6=$'\x1b[17~'
+SHELLFRAME_KEY_F7=$'\x1b[18~'
+SHELLFRAME_KEY_F8=$'\x1b[19~'
+SHELLFRAME_KEY_F9=$'\x1b[20~'
+SHELLFRAME_KEY_F10=$'\x1b[21~'
+SHELLFRAME_KEY_F11=$'\x1b[23~'
+SHELLFRAME_KEY_F12=$'\x1b[24~'
+# Modifier+arrow sequences: ESC [ 1 ; <mod> <dir>
+# Modifier codes: 2=Shift, 3=Alt, 5=Ctrl
+SHELLFRAME_KEY_SHIFT_UP=$'\x1b[1;2A'
+SHELLFRAME_KEY_SHIFT_DOWN=$'\x1b[1;2B'
+SHELLFRAME_KEY_SHIFT_RIGHT=$'\x1b[1;2C'
+SHELLFRAME_KEY_SHIFT_LEFT=$'\x1b[1;2D'
+SHELLFRAME_KEY_ALT_UP=$'\x1b[1;3A'
+SHELLFRAME_KEY_ALT_DOWN=$'\x1b[1;3B'
+SHELLFRAME_KEY_ALT_RIGHT=$'\x1b[1;3C'
+SHELLFRAME_KEY_ALT_LEFT=$'\x1b[1;3D'
+SHELLFRAME_KEY_CTRL_UP=$'\x1b[1;5A'
+SHELLFRAME_KEY_CTRL_DOWN=$'\x1b[1;5B'
+SHELLFRAME_KEY_CTRL_RIGHT=$'\x1b[1;5C'
+SHELLFRAME_KEY_CTRL_LEFT=$'\x1b[1;5D'
 
 # Read one keypress (including full escape sequences) into a variable.
 #
@@ -93,8 +122,20 @@ shellframe_read_key() {
         _k+="${_c}"
         # CSI (ESC [) and SS3 (ESC O): read parameter bytes until a final byte.
         # Final bytes are letters (A-Z, a-z) or ~.  Bail on read timeout.
-        # This handles sequences of any length: 3-byte (ESC [ A), 4-byte
-        # (ESC [ 3 ~), and longer like bracketed paste (ESC [ 2 0 0 ~).
+        #
+        # This loop is the generic CSI drain path: it consumes the complete
+        # sequence regardless of whether the resulting sequence is a recognized
+        # key constant.  Unrecognized sequences (e.g. ESC [ 9 9 9 ~) are fully
+        # drained so they cannot corrupt subsequent key reads.  The caller can
+        # compare _k against any SHELLFRAME_KEY_* constant; unknown sequences
+        # simply produce no match and are silently discarded.
+        #
+        # Sequence length coverage:
+        #   3-byte:  ESC [ A           (arrow keys, shift_tab, home, end)
+        #   4-byte:  ESC [ 3 ~         (delete, page_up, page_down, F5–F12)
+        #   5-byte:  ESC O P           (F1–F4 via SS3; final byte in first read)
+        #   7-byte:  ESC [ 1 ; 2 A     (modifier+arrow: shift/alt/ctrl + arrow)
+        #   longer:  ESC [ 2 0 0 ~     (bracketed paste start/end)
         if [[ "$_c" == '[' || "$_c" == 'O' ]]; then
             while true; do
                 IFS= read -r -n1 -d '' -t 1 _c || break
