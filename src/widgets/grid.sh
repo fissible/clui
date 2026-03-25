@@ -337,12 +337,10 @@ shellframe_grid_render() {
             fi
         fi
 
-        # Activate reverse video for the entire cursor row before writing any cell.
-        # The attribute persists through absolute cursor moves, so all subsequent
-        # cells and separators will be rendered in reverse video.
+        # Fill cursor row with cursor bg so there are no gaps between cells.
         if (( _is_cursor )); then
             local _cursor_attr="${SHELLFRAME_GRID_CURSOR_STYLE:-$_rev}"
-            printf '\033[%d;%dH%s' "$_row" "$_left" "$_cursor_attr" >&3
+            printf '\033[%d;%dH%s%*s\033[%d;%dH' "$_row" "$_left" "$_cursor_attr" "$_width" '' "$_row" "$_left" >&3
         fi
 
         local _vi
