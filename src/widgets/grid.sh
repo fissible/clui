@@ -106,6 +106,7 @@ SHELLFRAME_GRID_COLS=0
 SHELLFRAME_GRID_BG=""
 SHELLFRAME_GRID_STRIPE_BG=""
 SHELLFRAME_GRID_CURSOR_STYLE=""
+SHELLFRAME_GRID_HEADER_STYLE=""
 
 # ── shellframe_grid_init ───────────────────────────────────────────────────────
 
@@ -260,9 +261,10 @@ shellframe_grid_render() {
             local _avail=$(( _width - _pad_xoff ))
             (( _avail > _cw - 1 )) && _avail=$(( _cw - 1 ))
             (( _avail <= 0 )) && continue
+            local _hdr_style="${SHELLFRAME_GRID_HEADER_STYLE:-${_bold}${_white}}"
             local _clipped
             _clipped=$(shellframe_str_clip_ellipsis "$_hdr" \
-                "${_bold}${_white}${_hdr}${_bg_rst}" "$_avail")
+                "${_hdr_style}${_hdr}${_bg_rst}" "$_avail")
             printf '\033[%d;%dH%s' "$_top" "$(( _left + _pad_xoff ))" "$_clipped" >&3
 
             # Separator after this header
