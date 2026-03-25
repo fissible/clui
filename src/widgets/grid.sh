@@ -263,9 +263,8 @@ shellframe_grid_render() {
             (( _avail <= 0 )) && continue
             local _hdr_style="${SHELLFRAME_GRID_HEADER_STYLE:-${_bold}${_white}}"
             local _clipped
-            _clipped=$(shellframe_str_clip_ellipsis "$_hdr" \
-                "${_hdr_style}${_hdr}${_bg_rst}" "$_avail")
-            printf '\033[%d;%dH%s' "$_top" "$(( _left + _pad_xoff ))" "$_clipped" >&3
+            _clipped=$(shellframe_str_clip_ellipsis "$_hdr" "$_hdr" "$_avail")
+            printf '\033[%d;%dH%s%s%s' "$_top" "$(( _left + _pad_xoff ))" "$_hdr_style" "$_clipped" "$_bg_rst" >&3
 
             # Separator after this header
             if (( _vi < _n_vis_seps )); then
