@@ -45,6 +45,7 @@ SHELLFRAME_LIST_MULTISELECT=0
 SHELLFRAME_LIST_FOCUSED=0
 SHELLFRAME_LIST_FOCUSABLE=1
 SHELLFRAME_LIST_CURSOR_STYLE=""
+SHELLFRAME_LIST_BG=""
 SHELLFRAME_LIST_ITEMS=()
 
 # ── shellframe_list_init ─────────────────────────────────────────────────────
@@ -84,7 +85,8 @@ shellframe_list_render() {
         local _item_idx=$(( _scroll_top + _r ))
 
         # Clear this row (only within the list's own column range)
-        printf '\033[%d;%dH%*s' "$_row" "$_left" "$_width" '' >&3
+        local _lbg="${SHELLFRAME_LIST_BG:-}"
+        printf '\033[%d;%dH%s%*s' "$_row" "$_left" "$_lbg" "$_width" '' >&3
 
         [[ $_item_idx -ge $_n ]] && continue
 
