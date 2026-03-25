@@ -120,7 +120,7 @@ Start every new session by reading this file. Update task status here when work 
 | B | Dirty-region rendering: widget dirty flags + conditional re-render in app loop; `shellframe_screen_clear` only called when full repaint is needed; render fns still write to `/dev/tty` — no API break | M | [#30](https://github.com/fissible/shellframe/issues/30) | closed | 18 |
 | C | Mouse: `shellframe_mouse_enter/exit` in `screen.sh`; SGR mouse sequence parsing in `shellframe_read_key`; `SHELLFRAME_MOUSE_COL/ROW/BUTTON/ACTION` output vars | S | [#32](https://github.com/fissible/shellframe/issues/32) | closed | A |
 | D | Widget hit-test registry: `shellframe_widget_register name top left width height` + `shellframe_widget_at row col`; new module `src/hitbox.sh` | M | [#31](https://github.com/fissible/shellframe/issues/31) | closed | 9, 18 |
-| E | Mouse routing in app shell + `on_mouse` handler per widget (click-to-focus, click-to-select in lists, scroll-wheel in scroll views) | M | [#34](https://github.com/fissible/shellframe/issues/34) | open | C, D |
+| E | Mouse routing in app shell + `on_mouse` handler per widget (click-to-focus, click-to-select in lists, scroll-wheel in scroll views) | M | [#34](https://github.com/fissible/shellframe/issues/34) | closed | C, D |
 | F | Framebuffer diff rendering: `_SF_FRAME_CURR/PREV[row*COLS+col]` flat indexed arrays; all render fns write to framebuffer instead of `/dev/tty`; `shellframe_screen_flush` diffs and emits only changed cells. See migration note in `src/screen.sh`. | XL | [#33](https://github.com/fissible/shellframe/issues/33) | open | B |
 
 ---
@@ -283,4 +283,7 @@ _Last updated: 2026-03-16 (session 5)_
 - **Phase 7 status**: A ✓, B ✓, D ✓ — C (#32, mouse) now unblocked (deps A done); F (#33, framebuffer diff) now unblocked (deps B done); E (#34, mouse routing) waits for C+D (both done when C ships).
 - **Phase 7C mouse parsing complete (2026-03-25)**: [shellframe#32](https://github.com/fissible/shellframe/issues/32) closed. `src/screen.sh`: `shellframe_mouse_enter/exit` (SGR 1000+1006). `src/input.sh`: `SHELLFRAME_KEY_MOUSE` sentinel, `SHELLFRAME_MOUSE_{BUTTON,COL,ROW,ACTION}` globals, SGR parse branch in CSI drain. 15 new assertions (8 subprocess IO-validation). 1166/1166 pass.
 - **Phase 7 status**: A ✓, B ✓, C ✓, D ✓ — E (#34, mouse routing) now unblocked (deps C+D both done); F (#33, framebuffer diff, deps B done) also unblocked.
-- **Next**: Task E (#34, mouse routing in shell + on_mouse per widget) — largest remaining item; then F (#33).
+- **Phase 7E mouse routing complete (2026-03-25)**: [shellframe#34](https://github.com/fissible/shellframe/issues/34) closed. `shellframe_sel_set` (selection.sh), hitbox auto-sync in `shellframe_shell_region`, SGR parse in `_shellframe_shell_read_key`, mouse dispatch branch in event loop, `shellframe_mouse_enter/exit` in `shellframe_shell`. `shellframe_list_on_mouse` (click-to-select + scroll-wheel) and `shellframe_scroll_on_mouse` (generic scroll-wheel). 7 PTY IO-validation integration tests. 1253/1253 pass.
+- **Phase 7 status**: A ✓, B ✓, C ✓, D ✓, E ✓ — only F (#33, framebuffer diff, XL) remains.
+- **M4 milestone near**: All Phase 7 tasks except F done. F is a large architectural change (all render fns write to framebuffer instead of /dev/tty). PM should decide whether to cut a release before tackling F.
+- **Next**: PM decision — cut release, start F (#33, framebuffer diff), or other work.
