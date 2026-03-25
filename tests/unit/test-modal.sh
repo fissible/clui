@@ -14,6 +14,11 @@ source "$SHELLFRAME_DIR/src/widgets/input-field.sh"
 source "$SHELLFRAME_DIR/src/widgets/modal.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
+# ── fd 3 / coverage-trace setup ──────────────────────────────────────────────
+exec 4>&3 2>/dev/null || true
+exec 3>/dev/null
+BASH_XTRACEFD=4
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 _reset_modal() {

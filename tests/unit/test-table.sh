@@ -9,6 +9,15 @@ SHELLFRAME_DIR="$(cd "$TESTS_DIR/.."; pwd)"
 source "$SHELLFRAME_DIR/shellframe.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
+# ── fd 3 / coverage-trace setup ──────────────────────────────────────────────
+# ptyunit coverage uses BASH_XTRACEFD=3; widgets write to >&3. Dup the trace fd
+# to 4 first, then redirect fd 3 to /dev/null so render output is discarded
+# without killing the trace. In normal (non-coverage) runs fd 3 is not open, so
+# exec 4>&3 is a silent no-op.
+exec 4>&3 2>/dev/null || true   # dup trace fd; no-op outside coverage mode
+exec 3>/dev/null                 # discard widget render output
+BASH_XTRACEFD=4                  # keep trace on fd 4, safe from >&3 redirects
+
 _reset_tbl() {
     SHELLFRAME_TBL_SELECTED=0
     SHELLFRAME_TBL_SCROLL=0
@@ -142,5 +151,32 @@ SHELLFRAME_TBL_SELECTED=2
 _shellframe_table_scroll_check 5
 assert_eq "1" "$?" "returns 1 (no change)"
 assert_eq "2" "$SHELLFRAME_TBL_SCROLL" "scroll unchanged"
+
+# ── _shellframe_tbl_default_draw_row ─────────────────────────────────────────
+
+ptyunit_test_begin "tbl_default_draw_row: non-selected row has no cursor"
+SHELLFRAME_TBL_SELECTED=1
+_out=$(_shellframe_tbl_default_draw_row 0 "apple" "eat skip" 0 "")
+assert_not_contains "$_out" "> " "non-selected row has no cursor"
+
+ptyunit_test_begin "tbl_default_draw_row: selected row has cursor indicator"
+SHELLFRAME_TBL_SELECTED=0
+_out=$(_shellframe_tbl_default_draw_row 0 "apple" "eat skip" 0 "")
+assert_contains "$_out" "> " "selected row has cursor"
+
+ptyunit_test_begin "tbl_default_draw_row: shows label in output"
+SHELLFRAME_TBL_SELECTED=0
+_out=$(_shellframe_tbl_default_draw_row 0 "banana" "eat skip" 0 "")
+assert_contains "$_out" "banana" "label appears in output"
+
+ptyunit_test_begin "tbl_default_draw_row: shows current action in brackets"
+SHELLFRAME_TBL_SELECTED=0
+_out=$(_shellframe_tbl_default_draw_row 0 "apple" "eat skip" 1 "")
+assert_contains "$_out" "[skip]" "action index 1 shows skip"
+
+ptyunit_test_begin "tbl_default_draw_row: first action shown at index 0"
+SHELLFRAME_TBL_SELECTED=0
+_out=$(_shellframe_tbl_default_draw_row 0 "apple" "eat skip" 0 "")
+assert_contains "$_out" "[eat]" "action index 0 shows eat"
 
 ptyunit_test_summary

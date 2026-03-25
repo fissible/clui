@@ -13,7 +13,14 @@ source "$SHELLFRAME_DIR/src/panel.sh"
 source "$SHELLFRAME_DIR/src/widgets/menu-bar.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
-exec 3>/dev/null   # discard render output (no terminal in unit tests)
+# ── fd 3 / coverage-trace setup ──────────────────────────────────────────────
+# ptyunit coverage uses BASH_XTRACEFD=3; widgets write to >&3. Dup the trace fd
+# to 4 first, then redirect fd 3 to /dev/null so render output is discarded
+# without killing the trace. In normal (non-coverage) runs fd 3 is not open, so
+# exec 4>&3 is a silent no-op.
+exec 4>&3 2>/dev/null || true   # dup trace fd; no-op outside coverage mode
+exec 3>/dev/null                 # discard widget render output
+BASH_XTRACEFD=4                  # keep trace on fd 4, safe from >&3 redirects
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

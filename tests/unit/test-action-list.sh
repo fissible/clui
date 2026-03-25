@@ -105,4 +105,31 @@ SHELLFRAME_AL_SELECTED=1
 _shellframe_action_list_on_key "z" 3
 assert_eq "1" "$SHELLFRAME_AL_SELECTED" "cursor unchanged"
 
+# ── _shellframe_al_default_draw_row ──────────────────────────────────────────
+
+ptyunit_test_begin "al_default_draw_row: non-selected row has no cursor"
+SHELLFRAME_AL_SELECTED=1
+_out=$(_shellframe_al_default_draw_row 0 "apple" "eat skip" 0 "")
+assert_not_contains "$_out" "> " "non-selected row has no cursor"
+
+ptyunit_test_begin "al_default_draw_row: selected row has cursor indicator"
+SHELLFRAME_AL_SELECTED=0
+_out=$(_shellframe_al_default_draw_row 0 "apple" "eat skip" 0 "")
+assert_contains "$_out" "> " "selected row has cursor"
+
+ptyunit_test_begin "al_default_draw_row: shows label in output"
+SHELLFRAME_AL_SELECTED=0
+_out=$(_shellframe_al_default_draw_row 0 "banana" "eat skip" 0 "")
+assert_contains "$_out" "banana" "label appears in output"
+
+ptyunit_test_begin "al_default_draw_row: shows current action in brackets"
+SHELLFRAME_AL_SELECTED=0
+_out=$(_shellframe_al_default_draw_row 0 "apple" "eat skip" 1 "")
+assert_contains "$_out" "[skip]" "action index 1 shows skip"
+
+ptyunit_test_begin "al_default_draw_row: first action shown at index 0"
+SHELLFRAME_AL_SELECTED=0
+_out=$(_shellframe_al_default_draw_row 0 "apple" "eat skip" 0 "")
+assert_contains "$_out" "[eat]" "action index 0 shows eat"
+
 ptyunit_test_summary

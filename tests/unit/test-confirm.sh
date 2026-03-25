@@ -136,4 +136,25 @@ SHELLFRAME_CONFIRM_SELECTED=0
 _shellframe_confirm_on_key "x"
 assert_eq "0" "$SHELLFRAME_CONFIRM_SELECTED" "selection unchanged"
 
+# ── _shellframe_confirm_draw_buttons ─────────────────────────────────────────
+
+ptyunit_test_begin "confirm_draw_buttons: Yes selected — Yes is bold/white"
+_out=$(_shellframe_confirm_draw_buttons 5 0 40 1)
+assert_contains "$_out" "[ Yes ]" "Yes label present"
+assert_contains "$_out" "[ No  ]" "No label present"
+
+ptyunit_test_begin "confirm_draw_buttons: No selected — No is bold/white"
+_out=$(_shellframe_confirm_draw_buttons 5 1 40 1)
+assert_contains "$_out" "[ Yes ]" "Yes label present"
+assert_contains "$_out" "[ No  ]" "No label present"
+
+ptyunit_test_begin "confirm_draw_buttons: includes border pipes"
+_out=$(_shellframe_confirm_draw_buttons 5 0 40 1)
+assert_contains "$_out" "|" "border pipes present"
+
+ptyunit_test_begin "confirm_draw_buttons: inner too narrow — blpad clamps to 1"
+# inner=22 (< btn_raw=20+2 pads), blpad would be 1, brpad 0
+_out=$(_shellframe_confirm_draw_buttons 5 0 22 1)
+assert_contains "$_out" "[ Yes ]" "renders without crash on narrow inner"
+
 ptyunit_test_summary

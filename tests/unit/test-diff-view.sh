@@ -8,6 +8,16 @@ SHELLFRAME_DIR="$(cd "$TESTS_DIR/.."; pwd)"
 source "$SHELLFRAME_DIR/shellframe.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
+# ── fd 3 / coverage-trace setup ──────────────────────────────────────────────
+# ptyunit coverage uses BASH_XTRACEFD=3; widgets write to >&3. Without this fix,
+# exec 3>"$_f" in _dv_capture routes PS4 trace lines into the capture buffer,
+# causing assert_not_contains failures (PS4 lines contain variable values like
+# the filename "src/old.sh"). Dup trace to fd 4 first so redirecting fd 3 for
+# render capture doesn't contaminate the output or kill the trace.
+exec 4>&3 2>/dev/null || true
+exec 3>/dev/null
+BASH_XTRACEFD=4
+
 _setup_diff() {
     # Minimal parsed diff: one context line, one add, one del
     SHELLFRAME_DIFF_TYPES=("ctx" "add" "del")

@@ -46,6 +46,20 @@
 SHELLFRAME_AL_SELECTED=0
 SHELLFRAME_AL_SAVED_STTY=""
 
+# _shellframe_al_default_draw_row i label acts_str aidx meta
+# Default row renderer for shellframe_action_list.
+# Reads SHELLFRAME_AL_SELECTED to render the cursor indicator.
+# Prints one line (with trailing newline) to stdout.
+_shellframe_al_default_draw_row() {
+    local _di="$1" _dlabel="$2" _dacts_str="$3" _daidx="$4"
+    local _dcursor="  "
+    (( _di == SHELLFRAME_AL_SELECTED )) && _dcursor="${SHELLFRAME_BOLD}> ${SHELLFRAME_RESET}"
+    local -a _dacts
+    IFS=' ' read -r -a _dacts < <(printf '%s\n' "$_dacts_str")
+    local _daction="${_dacts[$_daidx]}"
+    printf "%b%-24s  [%s]\n" "$_dcursor" "$_dlabel" "$_daction"
+}
+
 # _shellframe_action_list_on_key key n_items
 # Handles one keypress for the action-list widget.
 # Reads/writes: SHELLFRAME_AL_SELECTED, SHELLFRAME_AL_ACTIONS[], SHELLFRAME_AL_IDX[]
@@ -112,15 +126,7 @@ shellframe_action_list() {
     shellframe_cursor_hide
 
     # ── Default row renderer ──────────────────────────────────────────────
-    _al_default_draw_row() {
-        local _di="$1" _dlabel="$2" _dacts_str="$3" _daidx="$4"
-        local _dcursor="  "
-        (( _di == SHELLFRAME_AL_SELECTED )) && _dcursor="${SHELLFRAME_BOLD}> ${SHELLFRAME_RESET}"
-        local -a _dacts
-        IFS=' ' read -r -a _dacts <<< "$_dacts_str"
-        local _daction="${_dacts[$_daidx]}"
-        printf "%b%-24s  [%s]\n" "$_dcursor" "$_dlabel" "$_daction"
-    }
+    _al_default_draw_row() { _shellframe_al_default_draw_row "$@"; }
 
     # ── Draw ──────────────────────────────────────────────────────────────
     _al_draw() {

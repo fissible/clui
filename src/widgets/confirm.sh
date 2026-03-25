@@ -27,6 +27,33 @@
 SHELLFRAME_CONFIRM_SELECTED=0   # 0 = Yes highlighted, 1 = No highlighted
 SHELLFRAME_CONFIRM_RESULT=-1    # 0 = Yes, 1 = No (set by _on_key on exit)
 
+# _shellframe_confirm_draw_buttons brow selected inner c0
+# Render the Yes/No button row at absolute terminal row brow.
+#   selected — 0=Yes highlighted, 1=No highlighted
+#   inner    — inner box width in characters
+#   c0       — leftmost column of the dialog box (1-indexed)
+# Writes directly to stdout (which shellframe_confirm has wired to fd 3 via
+# exec 1>&3; in unit tests output goes to stdout for capture).
+_shellframe_confirm_draw_buttons() {
+    local _brow="$1" _selected="$2" _inner="$3" _c0="$4"
+    local _yes_str _no_str
+    if (( _selected == 0 )); then
+        _yes_str="${SHELLFRAME_BOLD}${SHELLFRAME_WHITE}[ Yes ]${SHELLFRAME_RESET}"
+        _no_str="${SHELLFRAME_GRAY}[ No  ]${SHELLFRAME_RESET}"
+    else
+        _yes_str="${SHELLFRAME_GRAY}[ Yes ]${SHELLFRAME_RESET}"
+        _no_str="${SHELLFRAME_BOLD}${SHELLFRAME_WHITE}[ No  ]${SHELLFRAME_RESET}"
+    fi
+    local _btn_raw=20
+    local _blpad=$(( (_inner - _btn_raw) / 2 ))
+    local _brpad=$(( _inner - _btn_raw - _blpad ))
+    (( _blpad < 1 )) && _blpad=1
+    (( _brpad < 0 )) && _brpad=0
+    printf '\033[%d;%dH%b|%b' "$_brow" "$_c0" "$SHELLFRAME_GRAY" "$SHELLFRAME_RESET"
+    printf '%*s%b      %b%*s' "$_blpad" "" "$_yes_str" "$_no_str" "$_brpad" ""
+    printf '%b|%b' "$SHELLFRAME_GRAY" "$SHELLFRAME_RESET"
+}
+
 # _shellframe_confirm_on_key key
 # Handles one keypress. Mutates SHELLFRAME_CONFIRM_SELECTED and SHELLFRAME_CONFIRM_RESULT.
 # Returns: 0 = selection changed (redraw needed)
@@ -121,26 +148,7 @@ shellframe_confirm() {
     # ── row renderer ─────────────────────────────────────────────────────────
 
     # Render the button row at absolute terminal row $1.
-    # Reads from enclosing scope: _selected, _inner, _c0
-    _cf_draw_buttons() {
-        local _brow="$1"
-        local _yes_str _no_str
-        if (( _selected == 0 )); then
-            _yes_str="${SHELLFRAME_BOLD}${SHELLFRAME_WHITE}[ Yes ]${SHELLFRAME_RESET}"
-            _no_str="${SHELLFRAME_GRAY}[ No  ]${SHELLFRAME_RESET}"
-        else
-            _yes_str="${SHELLFRAME_GRAY}[ Yes ]${SHELLFRAME_RESET}"
-            _no_str="${SHELLFRAME_BOLD}${SHELLFRAME_WHITE}[ No  ]${SHELLFRAME_RESET}"
-        fi
-        local _btn_raw=20
-        local _blpad=$(( (_inner - _btn_raw) / 2 ))
-        local _brpad=$(( _inner - _btn_raw - _blpad ))
-        (( _blpad < 1 )) && _blpad=1
-        (( _brpad < 0 )) && _brpad=0
-        printf '\033[%d;%dH%b|%b' "$_brow" "$_c0" "$SHELLFRAME_GRAY" "$SHELLFRAME_RESET"
-        printf '%*s%b      %b%*s' "$_blpad" "" "$_yes_str" "$_no_str" "$_brpad" ""
-        printf '%b|%b' "$SHELLFRAME_GRAY" "$SHELLFRAME_RESET"
-    }
+    _cf_draw_buttons() { _shellframe_confirm_draw_buttons "$1" "$_selected" "$_inner" "$_c0"; }
 
     _cf_draw() {
         if (( _dirty == 0 )); then return; fi

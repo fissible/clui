@@ -252,3 +252,20 @@ _Last updated: 2026-03-16 (session 5)_
 - **`main` is clean (2026-03-23)**: 1007/1007 unit assertions, no dirty worktrees, no stale branches. 17 commits ahead of origin (unpushed).
 - **Next**: PM decision — Phase 7 platform enhancements or other prioritised work.
 - **ptyunit upgraded to v1.3.0 (2026-03-24)**: Updated `homebrew-tap` formula from v1.0.0 → v1.3.0 (also picked up the `VERSION` file install added in v1.1.1). Resolved rebase conflict with upstream v1.1.1 commit, pushed to GitHub. `brew upgrade fissible/tap/ptyunit` applied cleanly (1.1.1 → 1.3.0). 1009/1009 unit assertions pass.
+- **Coverage restored + improved to 70% (2026-03-25)**:
+  - **Root cause of regression**: ptyunit v1.3.0 switched coverage tracing from `BASH_XTRACEFD=2` to `BASH_XTRACEFD=3`. Widget test files that do `exec 3>/dev/null` (to discard TUI render output) were silently killing the trace for their entire file. Previous 70% reading was measured with an older ptyunit version; v1.3.0 baseline measured 56.6%.
+  - **Fix — fd dup technique**: Added to 8 affected test files (`test-menu-bar.sh`, `test-diff-view.sh`, `test-grid.sh`, `test-modal.sh`, `test-panel.sh`, `test-tab-bar.sh`, `test-table.sh`, `test-confirm.sh`):
+    ```bash
+    exec 4>&3 2>/dev/null || true   # dup trace fd; no-op outside coverage mode
+    exec 3>/dev/null                 # discard widget render output
+    BASH_XTRACEFD=4                  # keep trace on fd 4, safe from >&3 redirects
+    ```
+  - **New test file**: `tests/unit/test-screen.sh` — 8 assertions covering `shellframe_screen_clear`, `cursor_hide/show`, `raw_save`, `raw_enter`, `raw_exit`, `screen_exit`. `screen.sh`: **0% → 77%**.
+  - **Extracted draw-row helpers to module level** (enables direct unit testing without PTY):
+    - `_shellframe_al_default_draw_row` from `action-list.sh` — 5 new assertions in `test-action-list.sh`
+    - `_shellframe_confirm_draw_buttons` from `confirm.sh` — 6 new assertions in `test-confirm.sh`
+    - `_shellframe_tbl_default_draw_row` from `table.sh` — 5 new assertions in `test-table.sh`
+  - **Result**: **70% total coverage** (3058/4356 lines), **1033/1033 assertions pass**. HTML report: `coverage/2026_03_25_07_21_10.html`.
+  - Highlights after fix: menu-bar.sh 51% (from ~1%), grid 89%, modal 92%, tab-bar 92%, panel 84%.
+  - Remaining low floors: action-list 24%, confirm 22%, table 20% — keyboard event loops requiring PTY input; not unit-traceable.
+- **Next**: PM decision — Phase 7 platform enhancements or other prioritised work. `main` should be pushed to origin (17+ commits behind as of 2026-03-23).

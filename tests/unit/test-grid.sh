@@ -13,6 +13,11 @@ source "$SHELLFRAME_DIR/src/scroll.sh"
 source "$SHELLFRAME_DIR/src/widgets/grid.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
+# ── fd 3 / coverage-trace setup ──────────────────────────────────────────────
+exec 4>&3 2>/dev/null || true   # dup trace fd; no-op outside coverage mode
+exec 3>/dev/null                 # discard widget render output
+BASH_XTRACEFD=4                  # keep trace on fd 4, safe from >&3 redirects
+
 # ── Setup helpers ─────────────────────────────────────────────────────────────
 
 # 3-column, 5-row grid

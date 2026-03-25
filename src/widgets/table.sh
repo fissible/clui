@@ -77,6 +77,20 @@
 
 SHELLFRAME_TBL_SELECTED=0
 SHELLFRAME_TBL_SCROLL=0
+
+# _shellframe_tbl_default_draw_row i label acts_str aidx meta
+# Default row renderer for shellframe_table.
+# Reads SHELLFRAME_TBL_SELECTED to render the cursor indicator.
+# Prints one line (without trailing newline) to stdout.
+_shellframe_tbl_default_draw_row() {
+    local _di="$1" _dlabel="$2" _dacts_str="$3" _daidx="$4"
+    local _dcursor="  "
+    (( _di == SHELLFRAME_TBL_SELECTED )) && _dcursor="${SHELLFRAME_BOLD}> ${SHELLFRAME_RESET}"
+    local -a _dacts
+    IFS=' ' read -r -a _dacts <<< "$_dacts_str"
+    local _daction="${_dacts[$_daidx]}"
+    printf "%b%-24s  [%s]" "$_dcursor" "$_dlabel" "$_daction"
+}
 SHELLFRAME_TBL_SAVED_STTY=""
 SHELLFRAME_TBL_COLS=0
 SHELLFRAME_TBL_HEADERS=()
@@ -192,15 +206,7 @@ shellframe_table() {
     shellframe_cursor_hide
 
     # ── Default row renderer ──────────────────────────────────────────────
-    _tbl_default_draw_row() {
-        local _di="$1" _dlabel="$2" _dacts_str="$3" _daidx="$4"
-        local _dcursor="  "
-        (( _di == SHELLFRAME_TBL_SELECTED )) && _dcursor="${SHELLFRAME_BOLD}> ${SHELLFRAME_RESET}"
-        local -a _dacts
-        IFS=' ' read -r -a _dacts <<< "$_dacts_str"
-        local _daction="${_dacts[$_daidx]}"
-        printf "%b%-24s  [%s]" "$_dcursor" "$_dlabel" "$_daction"
-    }
+    _tbl_default_draw_row() { _shellframe_tbl_default_draw_row "$@"; }
 
     # ── Main draw ─────────────────────────────────────────────────────────
     _tbl_draw() {
