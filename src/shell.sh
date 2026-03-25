@@ -320,7 +320,10 @@ _shellframe_shell_read_key() {
     fi
 
     if [[ "$_k" == $'\x1b' ]]; then
-        IFS= read -r -n1 -d '' -t 1 _c || true
+        # Short timeout for escape sequence detection (50ms on bash 4+, 1s on 3.2)
+        local _esc_t=1
+        (( BASH_VERSINFO[0] >= 4 )) && _esc_t=0.05
+        IFS= read -r -n1 -d '' -t "$_esc_t" _c || true
         _k+="${_c}"
         if [[ "$_c" == '[' || "$_c" == 'O' ]]; then
             while true; do

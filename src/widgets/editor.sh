@@ -65,6 +65,7 @@
 SHELLFRAME_EDITOR_CTX="editor"
 SHELLFRAME_EDITOR_FOCUSED=0
 SHELLFRAME_EDITOR_FOCUSABLE=1
+SHELLFRAME_EDITOR_BG=""
 SHELLFRAME_EDITOR_LINES=()
 SHELLFRAME_EDITOR_RESULT=""
 SHELLFRAME_EDITOR_WRAP=1
@@ -922,7 +923,7 @@ shellframe_editor_render() {
             local _screen_row=$(( _top + _r ))
             local _vr=$(( _vtop + _r ))
 
-            printf -v _tmp '\033[%d;%dH%*s' "$_screen_row" "$_left" "$_width" ''
+            printf -v _tmp '\033[%d;%dH%s%*s' "$_screen_row" "$_left" "${SHELLFRAME_EDITOR_BG:-}" "$_width" ''
             _buf+="$_tmp"
             [[ $_vr -ge $_total_vrows ]] && continue
 
@@ -969,7 +970,7 @@ shellframe_editor_render() {
             local _screen_row=$(( _top + _r ))
             local _content_row=$(( _vtop + _r ))
 
-            printf -v _tmp '\033[%d;%dH%*s' "$_screen_row" "$_left" "$_width" ''
+            printf -v _tmp '\033[%d;%dH%s%*s' "$_screen_row" "$_left" "${SHELLFRAME_EDITOR_BG:-}" "$_width" ''
             _buf+="$_tmp"
             [[ $_content_row -ge $_count ]] && continue
 
