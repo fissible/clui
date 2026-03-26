@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+## [0.2.0] - 2026-03-26
+
+### Added
+- Add dirty-region conditional re-render (#30)
+- Dirty-region conditional re-render — Phase 7B (#30)
+- Add F1–F12, modifier+arrow constants and CSI drain documentation
+- Add widget bounding-box registry (#31)
+- Add SGR mouse parsing and mouse enable/disable (#32)
+- SGR mouse parsing + mouse enable/disable — Phase 7C (#32)
+- Mouse routing — click-to-focus, click-to-select, scroll-wheel (#34)
+- Mouse routing — click-to-focus, click-to-select, scroll-wheel — Phase 7E (#34)
 ## [0.1.0] - 2026-03-25
 
 ### Added
