@@ -277,7 +277,6 @@ shellframe_tree_render() {
     shellframe_scroll_resize "$_ctx" "$_height" 1
 
     local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
-    local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
 
     local _view_arr
     _shellframe_tree_parse_view "$_ctx" _view_arr
@@ -294,7 +293,7 @@ shellframe_tree_render() {
         local _row=$(( _top + _r ))
         local _vi=$(( _scroll_top + _r ))
 
-        printf '\033[%d;%dH%*s' "$_row" "$_left" "$_width" '' >&3
+        shellframe_fb_fill "$_row" "$_left" "$_width"
 
         [[ $_vi -ge $_vcount ]] && continue
 
@@ -325,24 +324,14 @@ shellframe_tree_render() {
         local _clipped
         _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_width")
 
-        printf '\033[%d;%dH' "$_row" "$_left" >&3
-
         if (( _vi == _vcursor )); then
-            printf '%s' "$_rev" >&3
-            printf '%s' "$_clipped" >&3
             local _clen=${#_clipped}
-            local _k=0
-            while (( _k < _width - _clen )); do
-                printf ' ' >&3
-                (( _k++ ))
-            done
-            printf '%s' "$_rst" >&3
+            shellframe_fb_print "$_row" "$_left" "$_clipped" "$_rev"
+            shellframe_fb_fill  "$_row" "$(( _left + _clen ))" "$(( _width - _clen ))" " " "$_rev"
         else
-            printf '%s' "$_clipped" >&3
+            shellframe_fb_print "$_row" "$_left" "$_clipped"
         fi
     done
-
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_tree_on_key ────────────────────────────────────────────────────

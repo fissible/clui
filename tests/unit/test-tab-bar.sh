@@ -8,6 +8,7 @@ SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 source "$SHELLFRAME_DIR/src/clip.sh"
 source "$SHELLFRAME_DIR/src/draw.sh"
 source "$SHELLFRAME_DIR/src/input.sh"
+source "$SHELLFRAME_DIR/src/screen.sh"
 source "$SHELLFRAME_DIR/src/widgets/tab-bar.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
@@ -93,10 +94,12 @@ ptyunit_test_begin "tabbar_render: renders tab labels to fd 3"
 SHELLFRAME_TABBAR_LABELS=("Home" "Schema" "Query")
 SHELLFRAME_TABBAR_ACTIVE=0
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 1 60
 exec 3>"$_out"
 shellframe_tabbar_render 1 1 60 1
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Home"
 assert_contains "$_content" "Schema"
 rm -f "$_out"
@@ -105,10 +108,12 @@ ptyunit_test_begin "tabbar_render: active tab is present in output"
 SHELLFRAME_TABBAR_LABELS=("Files" "Edit" "View")
 SHELLFRAME_TABBAR_ACTIVE=1
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 1 60
 exec 3>"$_out"
 shellframe_tabbar_render 1 1 60 1
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Edit"
 rm -f "$_out"
 
@@ -116,10 +121,12 @@ ptyunit_test_begin "tabbar_render: empty labels array produces no label output"
 SHELLFRAME_TABBAR_LABELS=()
 SHELLFRAME_TABBAR_ACTIVE=0
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 1 40
 exec 3>"$_out"
 shellframe_tabbar_render 1 1 40 1
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_not_contains "$_content" "Home"
 assert_not_contains "$_content" "Edit"
 rm -f "$_out"
@@ -129,10 +136,12 @@ ptyunit_test_begin "tabbar_render: narrow width clips tab label with ellipsis"
 SHELLFRAME_TABBAR_LABELS=("LongTabLabel" "B")
 SHELLFRAME_TABBAR_ACTIVE=0
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 1 6
 exec 3>"$_out"
 shellframe_tabbar_render 1 1 6 1
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "…"
 rm -f "$_out"
 
@@ -140,10 +149,12 @@ ptyunit_test_begin "tabbar_render: renders separator between tabs"
 SHELLFRAME_TABBAR_LABELS=("A" "B" "C")
 SHELLFRAME_TABBAR_ACTIVE=0
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 1 40
 exec 3>"$_out"
 shellframe_tabbar_render 1 1 40 1
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "│"
 rm -f "$_out"
 

@@ -258,6 +258,9 @@ _shellframe_shell_draw() {
     # Refresh terminal size once per draw (no per-call stty forks)
     _shellframe_shell_refresh_size
 
+    # Start a fresh framebuffer frame (resets CURR + DIRTY; keeps PREV)
+    shellframe_fb_frame_start "$_SHELLFRAME_SHELL_ROWS" "$_SHELLFRAME_SHELL_COLS"
+
     # Apply any pending focus request to the PREVIOUS cycle's ring
     # so on_focus sees the correct owner before regions are re-registered.
     if [[ -n "$_SHELLFRAME_SHELL_FOCUS_REQUEST" ]]; then
@@ -311,6 +314,9 @@ _shellframe_shell_draw() {
             "${_prefix}_${_screen}_${_n}_render" "$_top" "$_left" "$_w" "$_h"
         fi
     done
+
+    # Flush only changed cells to the terminal
+    shellframe_screen_flush
 }
 
 # ── _shellframe_shell_draw_if_dirty ──────────────────────────────────────────
@@ -404,9 +410,11 @@ shellframe_shell() {
 
     while [[ "$_current" != "__QUIT__" ]]; do
 
-        # Enter new screen: reset focus ring index to 0, full draw
-        # Preserve any pending focus request (e.g. set before shell launch)
+        # Enter new screen: clear terminal + framebuffer, then full draw.
+        # shellframe_screen_clear resets _SF_FRAME_PREV so the next flush
+        # re-emits every cell (ensures no artifacts from the previous screen).
         _SHELLFRAME_SHELL_FOCUS_IDX=0
+        shellframe_screen_clear
         _shellframe_shell_draw "$_prefix" "$_current"
 
         # Input loop for this screen

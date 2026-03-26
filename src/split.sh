@@ -274,7 +274,6 @@ shellframe_split_render() {
     local _count="${!_count_var:-2}"
 
     local _color="${SHELLFRAME_GRAY:-}"
-    local _reset="${SHELLFRAME_RESET:-}"
 
     local _i
     for (( _i=0; _i < _count - 1; _i++ )); do
@@ -282,18 +281,17 @@ shellframe_split_render() {
         local _pos="${!_pos_var}"
 
         if [[ "$_dir" == "v" ]]; then
-            # Vertical separator: printf -v to avoid subshells
-            local _buf="" _tmp="" _r
+            # Vertical separator: one cell per row at column _pos
+            local _r
             for (( _r=0; _r < _height; _r++ )); do
-                printf -v _tmp '\033[%d;%dH│' "$(( _top + _r ))" "$_pos"
-                _buf+="$_tmp"
+                shellframe_fb_put "$(( _top + _r ))" "$_pos" "${_color}│"
             done
-            printf '%s%s%s' "$_color" "$_buf" "$_reset" >&3
         else
-            # Horizontal separator: single printf with repeated ─
-            local _fill="" _c
-            for (( _c=0; _c < _width; _c++ )); do _fill+="─"; done
-            printf '\033[%d;%dH%s%s%s' "$_pos" "$_left" "$_color" "$_fill" "$_reset" >&3
+            # Horizontal separator: one cell per column at row _pos
+            local _c
+            for (( _c=0; _c < _width; _c++ )); do
+                shellframe_fb_put "$_pos" "$(( _left + _c ))" "${_color}─"
+            done
         fi
     done
 }

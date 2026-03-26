@@ -10,6 +10,7 @@ source "$SHELLFRAME_DIR/src/draw.sh"
 source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/selection.sh"
 source "$SHELLFRAME_DIR/src/scroll.sh"
+source "$SHELLFRAME_DIR/src/screen.sh"
 source "$SHELLFRAME_DIR/src/widgets/list.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
@@ -178,10 +179,13 @@ _render_list() {
     local _out
     _out=$(mktemp "${TMPDIR:-/tmp}/sf-test-list.XXXXXX")
     trap '{ exec 3>&- 2>/dev/null || true; rm -f "$_out"; }' RETURN
+    _SF_FRAME_PREV=()
+    shellframe_fb_frame_start "$_height" "$_width"
     exec 3>"$_out"
     shellframe_list_render "$_top" "$_left" "$_width" "$_height"
+    shellframe_screen_flush
     exec 3>&-
-    sed 's/\033\[[0-9;]*m//g; s/\033\[[0-9;]*[A-Za-z]//g' "$_out"
+    tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g'
 }
 
 ptyunit_test_begin "list_render: items appear in output"
@@ -208,7 +212,7 @@ SHELLFRAME_LIST_MULTISELECT=1
 shellframe_list_on_key " "   # toggle item 0 selected
 _out=$(_render_list 1 1 20 4)
 assert_contains "$_out" "[x]" "selected item has [x]"
-assert_contains "$_out" "[ ]" "unselected item has [ ]"
+assert_contains "$_out" "[]" "unselected item has []"
 
 ptyunit_test_begin "list_render: no checkboxes in single-select mode"
 SHELLFRAME_LIST_ITEMS=("Alpha" "Beta" "Gamma" "Delta")

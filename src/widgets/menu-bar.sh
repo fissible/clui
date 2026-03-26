@@ -117,10 +117,9 @@ shellframe_menubar_init() {
 _shellframe_mb_blank_region() {
     local _top="$1" _left="$2" _width="$3" _height="$4"
     (( _width <= 0 || _height <= 0 )) && return 0
-    local _r _blank
-    printf -v _blank '%*s' "$_width" ''
+    local _r
     for (( _r=0; _r<_height; _r++ )); do
-        printf '\033[%d;%dH%s' "$(( _top + _r ))" "$_left" "$_blank" >&3
+        shellframe_fb_fill "$(( _top + _r ))" "$_left" "$_width"
     done
 }
 
@@ -190,22 +189,22 @@ shellframe_menubar_render() {
     fi
 
     # ── Bar row ────────────────────────────────────────────────────────────────
-    printf '\033[%d;%dH' "$_top" "$_left" >&3
-    local _col=0 _i _n_menus="${#SHELLFRAME_MENU_NAMES[@]}"
+    local _col=0 _c="$_left" _i _n_menus="${#SHELLFRAME_MENU_NAMES[@]}"
     for (( _i=0; _i<_n_menus; _i++ )); do
         local _lbl=" ${SHELLFRAME_MENU_NAMES[$_i]} "
         local _llen=${#_lbl}
         (( _col + _llen > _width )) && break
         if [[ "$_state" != "idle" && "$_i" == "$_bar_idx" ]]; then
-            printf '%s%s%s' "$_rev" "$_lbl" "$_rst" >&3
+            shellframe_fb_print "$_top" "$_c" "$_lbl" "$_rev"
         else
-            printf '%s' "$_lbl" >&3
+            shellframe_fb_print "$_top" "$_c" "$_lbl"
         fi
+        (( _c += _llen ))
         (( _col += _llen ))
     done
     # Fill remainder
     local _fill=$(( _width - _col ))
-    (( _fill > 0 )) && printf '%*s' "$_fill" '' >&3
+    (( _fill > 0 )) && shellframe_fb_fill "$_top" "$_c" "$_fill"
 
     # ── Dropdown panel ─────────────────────────────────────────────────────────
     [[ "$_state" == "idle" || "$_state" == "bar" ]] && return 0
@@ -227,10 +226,11 @@ shellframe_menubar_render() {
 
     # Draw double-border panel
     local _inner_w=$(( _dd_w - 2 )) _inner_left=$(( _label_col + 1 ))
+    local _dd_right=$(( _label_col + _inner_w + 1 ))
     # Top border
-    printf '\033[%d;%dH%s╔' "$_dd_top" "$_label_col" "$_act" >&3
-    local _k; for (( _k=0; _k<_inner_w; _k++ )); do printf '═' >&3; done
-    printf '╗%s' "$_rst" >&3
+    shellframe_fb_put  "$_dd_top" "$_label_col" "${_act}╔"
+    shellframe_fb_fill "$_dd_top" "$(( _label_col + 1 ))" "$_inner_w" '═' "$_act"
+    shellframe_fb_put  "$_dd_top" "$_dd_right" "${_act}╗"
 
     # Item rows
     local _mvar; _shellframe_mb_menu_var "$_bar_idx" _mvar
@@ -241,10 +241,10 @@ shellframe_menubar_render() {
         local _raw_item; eval "_raw_item=\"\${${_mvar}[$_i]}\""
         local _display _vn _lbl
         if _shellframe_mb_is_sep "$_raw_item"; then
-            # Separator row
-            printf '\033[%d;%dH%s║%s' "$_row" "$_label_col" "$_act" "$_rst" >&3
-            local _j; for (( _j=0; _j<_inner_w; _j++ )); do printf '═' >&3; done
-            printf '%s║%s' "$_act" "$_rst" >&3
+            # Separator row: ║═════════║
+            shellframe_fb_put  "$_row" "$_label_col" "${_act}║"
+            shellframe_fb_fill "$_row" "$(( _label_col + 1 ))" "$_inner_w" '═'
+            shellframe_fb_put  "$_row" "$_dd_right" "${_act}║"
             continue
         elif _shellframe_mb_parse_sigil "$_raw_item" _vn _lbl 2>/dev/null; then
             _display="${_lbl} ▶"
@@ -257,24 +257,25 @@ shellframe_menubar_render() {
         printf -v _padded '%-*s' "$_cell_w" "$_display"
         _padded="${_padded:0:$_cell_w}"
 
-        printf '\033[%d;%dH%s║%s' "$_row" "$_label_col" "$_act" "$_rst" >&3
+        shellframe_fb_put "$_row" "$_label_col" "${_act}║"
+        local _item_str=" ${_padded} "
         if [[ "$_state" == "submenu" && "$_i" == "$_dd_cursor" ]]; then
-            # ▶ item — dimmed when submenu is open
-            printf ' %s%s%s ' "${SHELLFRAME_RESET:-$'\033[0m'}" "$_padded" "${SHELLFRAME_RESET:-$'\033[0m'}" >&3
+            # ▶ item — dimmed when submenu is open (plain text, no highlight)
+            shellframe_fb_print "$_row" "$(( _label_col + 1 ))" "$_item_str"
         elif [[ "$_state" != "submenu" && "$_i" == "$_dd_cursor" ]]; then
             # Normal cursor highlight
-            printf ' %s%s%s ' "$_rev" "$_padded" "$_rst" >&3
+            shellframe_fb_print "$_row" "$(( _label_col + 1 ))" "$_item_str" "$_rev"
         else
-            printf ' %s ' "$_padded" >&3
+            shellframe_fb_print "$_row" "$(( _label_col + 1 ))" "$_item_str"
         fi
-        printf '%s║%s' "$_act" "$_rst" >&3
+        shellframe_fb_put "$_row" "$_dd_right" "${_act}║"
     done
 
     # Bottom border
     local _bot=$(( _dd_top + _dd_h - 1 ))
-    printf '\033[%d;%dH%s╚' "$_bot" "$_label_col" "$_act" >&3
-    for (( _k=0; _k<_inner_w; _k++ )); do printf '═' >&3; done
-    printf '╝%s' "$_rst" >&3
+    shellframe_fb_put  "$_bot" "$_label_col" "${_act}╚"
+    shellframe_fb_fill "$_bot" "$(( _label_col + 1 ))" "$_inner_w" '═' "$_act"
+    shellframe_fb_put  "$_bot" "$_dd_right" "${_act}╝"
 
     # ── Submenu panel ──────────────────────────────────────────────────────────
     [[ "$_state" != "submenu" ]] && return 0
@@ -305,10 +306,11 @@ shellframe_menubar_render() {
     printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_W"    '%d' "$_sm_w"
     printf -v "_SHELLFRAME_MB_${_ctx}_PREV_SM_H"    '%d' "$_sm_h"
 
+    local _sm_right=$(( _sm_left + _sm_inner_w + 1 ))
     # Top border
-    printf '\033[%d;%dH%s╔' "$_sm_top" "$_sm_left" "$_act" >&3
-    for (( _k=0; _k<_sm_inner_w; _k++ )); do printf '═' >&3; done
-    printf '╗%s' "$_rst" >&3
+    shellframe_fb_put  "$_sm_top" "$_sm_left" "${_act}╔"
+    shellframe_fb_fill "$_sm_top" "$(( _sm_left + 1 ))" "$_sm_inner_w" '═' "$_act"
+    shellframe_fb_put  "$_sm_top" "$_sm_right" "${_act}╗"
 
     local _sm_cursor; shellframe_sel_cursor "mb_${_ctx}_sm" _sm_cursor
     for (( _i=0; _i<_n_sm; _i++ )); do
@@ -316,19 +318,20 @@ shellframe_menubar_render() {
         local _si; eval "_si=\"\${${_sm_var}[$_i]}\""
         local _cell_w=$(( _sm_inner_w - 2 ))
         local _padded; printf -v _padded '%-*s' "$_cell_w" "$_si"; _padded="${_padded:0:$_cell_w}"
-        printf '\033[%d;%dH%s║%s' "$_row" "$_sm_left" "$_act" "$_rst" >&3
+        shellframe_fb_put "$_row" "$_sm_left" "${_act}║"
+        local _item_str=" ${_padded} "
         if [[ "$_i" == "$_sm_cursor" ]]; then
-            printf ' %s%s%s ' "$_rev" "$_padded" "$_rst" >&3
+            shellframe_fb_print "$_row" "$(( _sm_left + 1 ))" "$_item_str" "$_rev"
         else
-            printf ' %s ' "$_padded" >&3
+            shellframe_fb_print "$_row" "$(( _sm_left + 1 ))" "$_item_str"
         fi
-        printf '%s║%s' "$_act" "$_rst" >&3
+        shellframe_fb_put "$_row" "$_sm_right" "${_act}║"
     done
 
     local _sm_bot=$(( _sm_top + _sm_h - 1 ))
-    printf '\033[%d;%dH%s╚' "$_sm_bot" "$_sm_left" "$_act" >&3
-    for (( _k=0; _k<_sm_inner_w; _k++ )); do printf '═' >&3; done
-    printf '╝%s' "$_rst" >&3
+    shellframe_fb_put  "$_sm_bot" "$_sm_left" "${_act}╚"
+    shellframe_fb_fill "$_sm_bot" "$(( _sm_left + 1 ))" "$_sm_inner_w" '═' "$_act"
+    shellframe_fb_put  "$_sm_bot" "$_sm_right" "${_act}╝"
 }
 
 # ── shellframe_menubar_on_focus ────────────────────────────────────────────────

@@ -179,12 +179,10 @@ shellframe_text_render() {
         local _row=$(( _top + _r ))
         local _row_raw="${_raw_lines[$_r]:-}"
         local _row_ren="${_ren_lines[$_r]:-}"
-        printf '\033[%d;%dH' "$_row" "$_left" >&3
-        _shellframe_text_align "$_row_raw" "$_row_ren" "$_width" "$_align" >&3
+        local _line
+        _line=$(_shellframe_text_align "$_row_raw" "$_row_ren" "$_width" "$_align")
+        shellframe_fb_print_ansi "$_row" "$_left" "$_line"
     done
-
-    # Leave cursor at last row, column left (per component contract).
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_text_size ───────────────────────────────────────────────────────

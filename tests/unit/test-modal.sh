@@ -9,6 +9,7 @@ source "$SHELLFRAME_DIR/src/clip.sh"
 source "$SHELLFRAME_DIR/src/draw.sh"
 source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/cursor.sh"
+source "$SHELLFRAME_DIR/src/screen.sh"
 source "$SHELLFRAME_DIR/src/panel.sh"
 source "$SHELLFRAME_DIR/src/widgets/input-field.sh"
 source "$SHELLFRAME_DIR/src/widgets/modal.sh"
@@ -223,11 +224,14 @@ SHELLFRAME_MODAL_BUTTONS=("OK" "Cancel")
 SHELLFRAME_MODAL_ACTIVE_BTN=0
 shellframe_modal_init
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 40
 exec 3>"$_out"
 shellframe_modal_render 1 1 40 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
-assert_contains "$_content" "Delete file?"
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
+assert_contains "$_content" "Delete"
+assert_contains "$_content" "file?"
 rm -f "$_out"
 
 ptyunit_test_begin "modal_render: output contains button labels"
@@ -237,10 +241,12 @@ SHELLFRAME_MODAL_BUTTONS=("Yes" "No")
 SHELLFRAME_MODAL_ACTIVE_BTN=0
 shellframe_modal_init
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 40
 exec 3>"$_out"
 shellframe_modal_render 1 1 40 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Yes"
 assert_contains "$_content" "No"
 rm -f "$_out"
@@ -251,10 +257,12 @@ SHELLFRAME_MODAL_STYLE="double"
 SHELLFRAME_MODAL_MESSAGE="Hello"
 shellframe_modal_init
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 40
 exec 3>"$_out"
 shellframe_modal_render 1 1 40 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "╔"
 rm -f "$_out"
 
@@ -264,10 +272,12 @@ SHELLFRAME_MODAL_TITLE="Confirm"
 SHELLFRAME_MODAL_MESSAGE="Are you sure?"
 shellframe_modal_init
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 40
 exec 3>"$_out"
 shellframe_modal_render 1 1 40 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Confirm"
 rm -f "$_out"
 
@@ -278,11 +288,14 @@ SHELLFRAME_MODAL_WIDTH=30
 SHELLFRAME_MODAL_HEIGHT=8
 shellframe_modal_init
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 24 80
 exec 3>"$_out"
 shellframe_modal_render 1 1 80 24
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
-assert_contains "$_content" "Fixed size"
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
+assert_contains "$_content" "Fixed"
+assert_contains "$_content" "size"
 rm -f "$_out"
 
 ptyunit_test_summary

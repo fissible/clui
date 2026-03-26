@@ -80,14 +80,13 @@ shellframe_field_render() {
     shellframe_cur_pos  "$_ctx" _pos
 
     # Clear the row
-    printf '\033[%d;%dH\033[2K' "$_top" "$_left" >&3
+    shellframe_fb_fill "$_top" "$_left" "$_width"
 
     # Empty + unfocused: show placeholder
     if [[ -z "$_text" && $(( _focused )) -eq 0 && -n "$_placeholder" ]]; then
         local _ph
         _ph=$(shellframe_str_clip_ellipsis "$_placeholder" "$_placeholder" "$_width")
-        printf '\033[%d;%dH\033[2m%s\033[0m' "$_top" "$_left" "$_ph" >&3
-        printf '\033[%d;%dH' "$_top" "$_left" >&3
+        shellframe_fb_print "$_top" "$_left" "$_ph" $'\033[2m'
         return 0
     fi
 
@@ -110,43 +109,28 @@ shellframe_field_render() {
     local _vlen=${#_vis}
     local _cur_vis=$(( _pos - _scroll ))
 
-    printf '\033[%d;%dH' "$_top" "$_left" >&3
-
     if (( _focused )); then
         local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
-        local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
 
         # Text before cursor
-        printf '%s' "${_vis:0:$_cur_vis}" >&3
+        shellframe_fb_print "$_top" "$_left" "${_vis:0:$_cur_vis}"
 
         # Cursor: highlight char at cursor pos, or a space if at end of text
         if (( _cur_vis < _vlen )); then
-            printf '%s%s%s' "$_rev" "${_vis:$_cur_vis:1}" "$_rst" >&3
-            printf '%s' "${_vis:$(( _cur_vis + 1 ))}" >&3
+            shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_rev}${_vis:$_cur_vis:1}"
+            shellframe_fb_print "$_top" "$(( _left + _cur_vis + 1 ))" "${_vis:$(( _cur_vis + 1 ))}"
         else
-            printf '%s %s' "$_rev" "$_rst" >&3
+            shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_rev} "
         fi
 
         # Pad remaining columns
         local _drawn=$(( _vlen < _width ? _vlen : _width ))
         (( _cur_vis >= _vlen )) && (( _drawn++ )) || true
-        local _k=0
-        while (( _k < _width - _drawn )); do
-            printf ' ' >&3
-            (( _k++ ))
-        done
+        shellframe_fb_fill "$_top" "$(( _left + _drawn ))" "$(( _width - _drawn ))"
     else
-        printf '%s' "$_vis" >&3
-        # Pad remaining columns
-        local _k=0
-        while (( _k < _width - _vlen )); do
-            printf ' ' >&3
-            (( _k++ ))
-        done
+        shellframe_fb_print "$_top" "$_left" "$_vis"
+        shellframe_fb_fill  "$_top" "$(( _left + _vlen ))" "$(( _width - _vlen ))"
     fi
-
-    # Leave cursor at start of row (component contract)
-    printf '\033[%d;%dH' "$_top" "$_left" >&3
 }
 
 # ── shellframe_field_on_key ───────────────────────────────────────────────────
