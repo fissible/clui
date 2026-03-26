@@ -45,21 +45,165 @@ shellframe_screen_exit() {
 #     Render functions still write directly to /dev/tty. No API break.
 #     Captures ~80% of the benefit with minimal change.
 #
-#   Stage 2 — Full per-cell framebuffer diff (Phase 7 task F, GH #TBD):
-#     A flat indexed array _SF_FRAME_CURR[row*COLS+col] (and _PREV mirror)
-#     acts as a virtual screen. All render functions write to the framebuffer
-#     instead of /dev/tty — a mechanical but pervasive change touching
-#     panel.sh, draw.sh, and every widget. shellframe_screen_flush() diffs
-#     current vs prev and emits \033[row;colH + char only for changed cells.
-#     This is the "right" long-term answer: eliminates flicker entirely and
-#     makes large-TUI performance independent of unchanged regions.
-#     Depends on Stage 1 being stable first.
+#   Stage 2 — Full per-cell framebuffer diff (Phase 7 task F, GH #33): DONE
+#     _SF_FRAME_CURR / _SF_FRAME_PREV flat arrays act as a virtual screen.
+#     Composable widget render functions write cells via shellframe_fb_put /
+#     shellframe_fb_print / shellframe_fb_fill.  shellframe_screen_flush()
+#     diffs CURR vs PREV and emits only changed cells to fd 3.
+#     Standalone TUIs (alert, confirm, action-list, table) manage their own
+#     fd 3 lifecycle and are intentionally excluded.
 shellframe_screen_clear() {
     printf '\033[H\033[3J\033[2J' >&3
     # \033[H   — cursor home (top-left)
     # \033[3J  — erase saved lines (clears scrollback so the scrollbar
     #            doesn't shrink on each redraw)
     # \033[2J  — erase entire visible screen
+    # Reset both framebuffer planes so the next flush does a full redraw.
+    _SF_FRAME_CURR=()
+    _SF_FRAME_PREV=()
+    _SF_FRAME_DIRTY=()
+}
+
+# ── Framebuffer ──────────────────────────────────────────────────────────────
+#
+# Per-cell virtual framebuffer.  All composable widget render functions write
+# cells here instead of directly to fd 3.  shellframe_screen_flush() diffs
+# CURR vs PREV and emits only changed cells, eliminating full-screen rewrites
+# and the flicker they cause.
+#
+# Cell storage:
+#   _SF_FRAME_CURR[idx]  — cell being built this frame (ANSI prefix + char)
+#   _SF_FRAME_PREV[idx]  — last cell actually emitted to the terminal
+#   _SF_FRAME_DIRTY      — indices written this frame (deduplication happens at flush)
+#   idx = (row - 1) * _SF_FRAME_COLS + (col - 1)   (1-based row/col)
+#
+# Each cell is self-contained: it includes any ANSI attribute prefix plus one
+# character.  shellframe_screen_flush prepends \033[0m before each changed cell
+# to reset all attributes, preventing bleed between adjacent cells.
+#
+# Frame lifecycle:
+#   shellframe_fb_frame_start rows cols  — call at the top of every draw cycle
+#   ... widget render functions write cells via fb_put / fb_print / fb_fill ...
+#   shellframe_screen_flush              — emit only changed cells, swap buffers
+
+_SF_FRAME_CURR=()
+_SF_FRAME_PREV=()
+_SF_FRAME_DIRTY=()
+_SF_FRAME_ROWS=24
+_SF_FRAME_COLS=80
+
+# shellframe_fb_frame_start rows cols
+#   Reset CURR and DIRTY for a new draw cycle.  PREV is untouched — it holds
+#   the last committed state and is only cleared by shellframe_screen_clear.
+shellframe_fb_frame_start() {
+    _SF_FRAME_ROWS="${1:-24}"
+    _SF_FRAME_COLS="${2:-80}"
+    _SF_FRAME_CURR=()
+    _SF_FRAME_DIRTY=()
+}
+
+# shellframe_fb_put row col cell
+#   Write a single cell (ANSI prefix + one character) at (row, col).
+shellframe_fb_put() {
+    local _row="$1" _col="$2" _cell="$3"
+    local _idx=$(( (_row - 1) * _SF_FRAME_COLS + (_col - 1) ))
+    _SF_FRAME_CURR[$_idx]="$_cell"
+    _SF_FRAME_DIRTY+=("$_idx")
+}
+
+# shellframe_fb_print row col str [prefix]
+#   Write each character of str as a separate cell at (row, col+i).
+#   prefix is prepended to every cell (e.g. an ANSI highlight sequence).
+shellframe_fb_print() {
+    local _row="$1" _col="$2" _str="$3" _pfx="${4:-}"
+    local _i=0 _len="${#_str}"
+    while (( _i < _len )); do
+        local _ch="${_str:$_i:1}"
+        local _idx=$(( (_row - 1) * _SF_FRAME_COLS + (_col + _i - 1) ))
+        _SF_FRAME_CURR[$_idx]="${_pfx}${_ch}"
+        _SF_FRAME_DIRTY+=("$_idx")
+        (( _i++ ))
+    done
+}
+
+# shellframe_fb_fill row col n [char] [prefix]
+#   Fill n cells starting at (row, col) with char (default: space).
+#   prefix is prepended to every cell (e.g. a background colour sequence).
+shellframe_fb_fill() {
+    local _row="$1" _col="$2" _n="$3" _char="${4:- }" _pfx="${5:-}"
+    local _i=0
+    while (( _i < _n )); do
+        local _idx=$(( (_row - 1) * _SF_FRAME_COLS + (_col + _i - 1) ))
+        _SF_FRAME_CURR[$_idx]="${_pfx}${_char}"
+        _SF_FRAME_DIRTY+=("$_idx")
+        (( _i++ ))
+    done
+}
+
+# shellframe_screen_flush
+#   Diff CURR against PREV.  Emit \033[0m + cell to fd 3 for every changed cell.
+#   Also handles erasures: cells present in PREV but absent in CURR are emitted
+#   as spaces.  Updates PREV in place; cells that return to space are unset to
+#   keep PREV lean (avoids unbounded growth over many frames).
+# shellframe_fb_print_ansi row col rendered_str
+#   Like shellframe_fb_print but ANSI-aware.  CSI escape sequences are
+#   accumulated as attribute prefixes for the following visible character.
+#   SGR reset (\033[0m or \033[m) clears the accumulated prefix.
+#   Caller is responsible that rendered_str represents exactly the columns
+#   it is expected to occupy (raw visible width = # of non-ANSI chars).
+shellframe_fb_print_ansi() {
+    local _row="$1" _col="$2" _str="$3"
+    local _i=0 _len="${#_str}" _c="$_col"
+    local _attrs="" _in_esc=0
+
+    while (( _i < _len )); do
+        local _ch="${_str:$_i:1}"
+        if [[ "$_ch" == $'\033' ]]; then
+            _attrs+="$_ch"
+            _in_esc=1
+        elif (( _in_esc )); then
+            _attrs+="$_ch"
+            case "$_ch" in
+                [A-Za-z~])
+                    _in_esc=0
+                    # SGR reset clears accumulated attributes
+                    if [[ "$_attrs" == $'\033[0m' || "$_attrs" == $'\033[m' ]]; then
+                        _attrs=""
+                    fi
+                    ;;
+            esac
+        else
+            shellframe_fb_put "$_row" "$_c" "${_attrs}${_ch}"
+            (( _c++ ))
+        fi
+        (( _i++ ))
+    done
+}
+
+shellframe_screen_flush() {
+    local _cols="$_SF_FRAME_COLS"
+    local _idx
+
+    # Add erasures: cells present in PREV but not written this frame
+    for _idx in "${!_SF_FRAME_PREV[@]}"; do
+        [[ -z "${_SF_FRAME_CURR[$_idx]+x}" ]] && _SF_FRAME_DIRTY+=("$_idx")
+    done
+
+    for _idx in "${_SF_FRAME_DIRTY[@]+"${_SF_FRAME_DIRTY[@]}"}"; do
+        local _curr="${_SF_FRAME_CURR[$_idx]:- }"
+        local _prev="${_SF_FRAME_PREV[$_idx]:- }"
+        if [[ "$_curr" != "$_prev" ]]; then
+            local _row=$(( _idx / _cols + 1 ))
+            local _col=$(( _idx % _cols + 1 ))
+            printf '\033[%d;%dH\033[0m%s' "$_row" "$_col" "$_curr" >&3
+            if [[ "$_curr" == " " ]]; then
+                unset '_SF_FRAME_PREV[$_idx]'
+            else
+                _SF_FRAME_PREV[$_idx]="$_curr"
+            fi
+        fi
+    done
+    _SF_FRAME_DIRTY=()
 }
 
 # ── Cursor ───────────────────────────────────────────────────────────────────

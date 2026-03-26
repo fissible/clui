@@ -244,14 +244,11 @@ shellframe_grid_render() {
     shellframe_scroll_resize "$_ctx" "$_data_height" "$_trailing_vis_cols"
 
     local _grid_bg="${SHELLFRAME_GRID_BG:-}"
-    # Reset that preserves grid background (used after colored separators)
-    local _bg_rst="${_rst}${_grid_bg}"
 
     # ── Header label row ──────────────────────────────────────────────────────
     if (( _has_header )); then
         local _hdr_bg="${SHELLFRAME_GRID_HEADER_BG:-$_grid_bg}"
-        local _hdr_bg_rst="${_rst}${_hdr_bg}"
-        printf '\033[%d;%dH%s%*s\033[%d;%dH' "$_top" "$_left" "$_hdr_bg" "$_width" '' "$_top" "$_left" >&3
+        shellframe_fb_fill "$_top" "$_left" "$_width" " " "$_hdr_bg"
 
         local _vi
         for (( _vi=0; _vi<_n_vis_cols; _vi++ )); do
@@ -267,39 +264,41 @@ shellframe_grid_render() {
             local _hdr_style="${SHELLFRAME_GRID_HEADER_STYLE:-${_bold}${_white}}"
             local _clipped
             _clipped=$(shellframe_str_clip_ellipsis "$_hdr" "$_hdr" "$_avail")
-            printf '\033[%d;%dH%s%s%s' "$_top" "$(( _left + _pad_xoff ))" "$_hdr_style" "$_clipped" "$_hdr_bg_rst" >&3
+            shellframe_fb_print "$_top" "$(( _left + _pad_xoff ))" "$_clipped" "${_hdr_bg}${_hdr_style}"
 
             # Separator after this header
             if (( _vi < _n_vis_seps )); then
-                printf '\033[%d;%dH%s%s%s' \
-                    "$_top" "$(( _left + ${_vis_sep_x[$_vi]} ))" \
-                    "$_gray" "${_vis_sep_char[$_vi]}" "$_hdr_bg_rst" >&3
+                shellframe_fb_put "$_top" "$(( _left + ${_vis_sep_x[$_vi]} ))" \
+                    "${_hdr_bg}${_gray}${_vis_sep_char[$_vi]}"
             fi
         done
 
         # Right end-of-data border in header label row
         if (( _right_border_x >= 0 )); then
-            printf '\033[%d;%dH%s│%s' \
-                "$_top" "$(( _left + _right_border_x ))" "$_gray" "$_hdr_bg_rst" >&3
+            shellframe_fb_put "$_top" "$(( _left + _right_border_x ))" "${_hdr_bg}${_gray}│"
         fi
 
         # ── Header separator row: ─── with ┼/╋ at column separator positions ──
-        printf '\033[%d;%dH%s%s' "$(( _top + 1 ))" "$_left" "$_hdr_bg" "$_gray" >&3
+        shellframe_fb_fill "$(( _top + 1 ))" "$_left" "$_width" " " "$_hdr_bg"
         local _prev_x=0 _bvi
         for (( _bvi=0; _bvi<_n_vis_seps; _bvi++ )); do
             local _sep_x="${_vis_sep_x[$_bvi]}"
-            # Dashes from _prev_x up to (but not including) the separator pixel
             local _bdi
-            for (( _bdi=_prev_x; _bdi<_sep_x; _bdi++ )); do printf '─' >&3; done
-            printf '%s' "${_vis_sep_junc[$_bvi]}" >&3
+            for (( _bdi=_prev_x; _bdi<_sep_x; _bdi++ )); do
+                shellframe_fb_put "$(( _top + 1 ))" "$(( _left + _bdi ))" "${_hdr_bg}${_gray}─"
+            done
+            shellframe_fb_put "$(( _top + 1 ))" "$(( _left + _sep_x ))" \
+                "${_hdr_bg}${_gray}${_vis_sep_junc[$_bvi]}"
             _prev_x=$(( _sep_x + 1 ))
         done
-        # Remaining dashes to the right edge (or to the right border position)
         local _dash_end=$(( _right_border_x >= 0 ? _right_border_x : _width ))
         local _bdi
-        for (( _bdi=_prev_x; _bdi<_dash_end; _bdi++ )); do printf '─' >&3; done
-        if (( _right_border_x >= 0 )); then printf '┘' >&3; fi
-        printf '%s' "$_bg_rst" >&3
+        for (( _bdi=_prev_x; _bdi<_dash_end; _bdi++ )); do
+            shellframe_fb_put "$(( _top + 1 ))" "$(( _left + _bdi ))" "${_hdr_bg}${_gray}─"
+        done
+        if (( _right_border_x >= 0 )); then
+            shellframe_fb_put "$(( _top + 1 ))" "$(( _left + _right_border_x ))" "${_hdr_bg}${_gray}┘"
+        fi
     fi
 
     # ── Data rows ─────────────────────────────────────────────────────────────
@@ -315,19 +314,19 @@ shellframe_grid_render() {
         local _row=$(( _data_top + _r ))
         local _ridx=$(( _vscroll_top + _r ))
 
-        printf '\033[%d;%dH%s%*s\033[%d;%dH' "$_row" "$_left" "$_grid_bg" "$_width" '' "$_row" "$_left" >&3
-        [[ "$_ridx" -ge "$_nrows" ]] && continue
-
-        # Apply stripe background to even data rows; compute per-row bg reset
-        local _row_bg_rst="$_bg_rst"
-        if [[ -n "${SHELLFRAME_GRID_STRIPE_BG:-}" ]] && (( _ridx % 2 == 1 )); then
-            printf '\033[%d;%dH%s%*s' "$_row" "$_left" "$SHELLFRAME_GRID_STRIPE_BG" "$_width" '' >&3
-            printf '\033[%d;%dH' "$_row" "$_left" >&3
-            _row_bg_rst="${_rst}${SHELLFRAME_GRID_STRIPE_BG}"
-        fi
-
+        # Determine per-row background: cursor > stripe > grid bg
         local _is_cursor=0
         (( _ridx == _cursor && ${SHELLFRAME_GRID_FOCUSED:-0} )) && _is_cursor=1
+
+        local _row_bg="$_grid_bg"
+        if (( _is_cursor )); then
+            _row_bg="${SHELLFRAME_GRID_CURSOR_STYLE:-$_rev}"
+        elif [[ -n "${SHELLFRAME_GRID_STRIPE_BG:-}" ]] && (( _ridx % 2 == 1 )); then
+            _row_bg="$SHELLFRAME_GRID_STRIPE_BG"
+        fi
+
+        shellframe_fb_fill "$_row" "$_left" "$_width" " " "$_row_bg"
+        [[ "$_ridx" -ge "$_nrows" ]] && continue
 
         # Multi-select checkbox prefix for the first visible column
         local _prefix=""
@@ -337,12 +336,6 @@ shellframe_grid_render() {
             else
                 _prefix="[ ] "
             fi
-        fi
-
-        # Fill cursor row with cursor bg so there are no gaps between cells.
-        if (( _is_cursor )); then
-            local _cursor_attr="${SHELLFRAME_GRID_CURSOR_STYLE:-$_rev}"
-            printf '\033[%d;%dH%s%*s\033[%d;%dH' "$_row" "$_left" "$_cursor_attr" "$_width" '' "$_row" "$_left" >&3
         fi
 
         local _vi
@@ -366,61 +359,53 @@ shellframe_grid_render() {
 
             local _tlen="${#_text}"
             local _align="${SHELLFRAME_GRID_COL_ALIGN[$_ci]:-left}"
-            printf '\033[%d;%dH' "$_row" "$(( _left + _pad_xoff ))" >&3
+            local _col=$(( _left + _pad_xoff ))
             if (( _tlen > _avail )); then
-                # Text wider than column — clip with ellipsis (subshell only here)
                 local _clipped
                 _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_avail")
-                printf '%s' "$_clipped" >&3
+                shellframe_fb_print "$_row" "$_col" "$_clipped" "$_row_bg"
             else
                 local _pad=$(( _avail - _tlen ))
                 case "$_align" in
                     right)
-                        (( _pad > 0 )) && printf '%*s' "$_pad" '' >&3
-                        printf '%s' "$_text" >&3
+                        (( _pad > 0 )) && { shellframe_fb_fill "$_row" "$_col" "$_pad" " " "$_row_bg"; (( _col += _pad )); }
+                        shellframe_fb_print "$_row" "$_col" "$_text" "$_row_bg"
                         ;;
                     center)
                         local _lpad=$(( _pad / 2 ))
-                        (( _lpad > 0 )) && printf '%*s' "$_lpad" '' >&3
-                        printf '%s' "$_text" >&3
+                        (( _lpad > 0 )) && { shellframe_fb_fill "$_row" "$_col" "$_lpad" " " "$_row_bg"; (( _col += _lpad )); }
+                        shellframe_fb_print "$_row" "$_col" "$_text" "$_row_bg"
+                        (( _col += _tlen ))
                         local _rpad=$(( _pad - _lpad ))
-                        (( _rpad > 0 )) && printf '%*s' "$_rpad" '' >&3
+                        (( _rpad > 0 )) && shellframe_fb_fill "$_row" "$_col" "$_rpad" " " "$_row_bg"
                         ;;
                     *)  # left (default)
-                        printf '%s' "$_text" >&3
-                        (( _pad > 0 )) && printf '%*s' "$_pad" '' >&3
+                        shellframe_fb_print "$_row" "$_col" "$_text" "$_row_bg"
+                        (( _col += _tlen ))
+                        (( _pad > 0 )) && shellframe_fb_fill "$_row" "$_col" "$_pad" " " "$_row_bg"
                         ;;
                 esac
             fi
 
             # Separator after this column.
-            # Cursor row: separator inherits the active reverse-video attribute.
-            # Non-cursor row: gray separator, then reset back to normal.
+            # Cursor row: separator inherits cursor attr.
+            # Non-cursor row: gray separator with row bg.
             if (( _vi < _n_vis_seps )); then
                 local _sxoff="${_vis_sep_x[$_vi]}"
                 local _schar="${_vis_sep_char[$_vi]}"
                 if (( _is_cursor )); then
-                    printf '\033[%d;%dH%s' \
-                        "$_row" "$(( _left + _sxoff ))" "$_schar" >&3
+                    shellframe_fb_put "$_row" "$(( _left + _sxoff ))" "${_row_bg}${_schar}"
                 else
-                    printf '\033[%d;%dH%s%s%s' \
-                        "$_row" "$(( _left + _sxoff ))" \
-                        "$_gray" "$_schar" "$_row_bg_rst" >&3
+                    shellframe_fb_put "$_row" "$(( _left + _sxoff ))" "${_row_bg}${_gray}${_schar}"
                 fi
             fi
         done
 
-        (( _is_cursor )) && printf '%s' "$_rst" >&3
-
         # Right end-of-data border in data row (only for rows that have data)
         if (( _right_border_x >= 0 && _ridx < _nrows )); then
-            printf '\033[%d;%dH%s│%s' \
-                "$_row" "$(( _left + _right_border_x ))" "$_gray" "$_row_bg_rst" >&3
+            shellframe_fb_put "$_row" "$(( _left + _right_border_x ))" "${_row_bg}${_gray}│"
         fi
     done
-
-    # Leave cursor at last row, column left (component contract)
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_grid_on_key ─────────────────────────────────────────────────────

@@ -71,7 +71,6 @@ shellframe_list_render() {
     shellframe_scroll_resize "$_ctx" "$_height" 1
 
     local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
-    local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
 
     local _scroll_top
     shellframe_scroll_top "$_ctx" _scroll_top
@@ -86,7 +85,7 @@ shellframe_list_render() {
 
         # Clear this row (only within the list's own column range)
         local _lbg="${SHELLFRAME_LIST_BG:-}"
-        printf '\033[%d;%dH%s%*s' "$_row" "$_left" "$_lbg" "$_width" '' >&3
+        shellframe_fb_fill "$_row" "$_left" "$_width" " " "$_lbg"
 
         [[ $_item_idx -ge $_n ]] && continue
 
@@ -106,8 +105,6 @@ shellframe_list_render() {
         local _clipped
         _clipped=$(shellframe_str_clip_ellipsis "$_text" "$_text" "$_width")
 
-        printf '\033[%d;%dH' "$_row" "$_left" >&3
-
         if (( _item_idx == _cursor )); then
             # Highlight cursor row: custom style, reverse, or dim bg
             local _hl
@@ -119,23 +116,13 @@ shellframe_list_render() {
                 # Dark gray background (236) with normal text — subtle indicator
                 _hl=$'\033[48;5;236m'
             fi
-            printf '%s' "$_hl" >&3
-            printf '%s' "$_clipped" >&3
-            # Pad to full width under highlight
             local _clen=${#_clipped}
-            local _k=0
-            while (( _k < _width - _clen )); do
-                printf ' ' >&3
-                (( _k++ ))
-            done
-            printf '%s' "$_rst" >&3
+            shellframe_fb_print "$_row" "$_left" "$_clipped" "$_hl"
+            shellframe_fb_fill  "$_row" "$(( _left + _clen ))" "$(( _width - _clen ))" " " "$_hl"
         else
-            printf '%s' "$_clipped" >&3
+            shellframe_fb_print "$_row" "$_left" "$_clipped"
         fi
     done
-
-    # Leave cursor at last row, col left (component contract)
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
 }
 
 # ── shellframe_list_on_key ────────────────────────────────────────────────────

@@ -89,23 +89,24 @@ _shellframe_panel_chars() {
 
 # ── Internal: draw one horizontal border row ─────────────────────────────────
 
-# _shellframe_panel_hline row col width left_char fill_char right_char [title] [title_align]
-# Draws to stdout.  Visual column count is tracked explicitly (not ${#char}).
+# _shellframe_panel_hline row col width left_char fill_char right_char [title] [title_align] [attrs]
+# Writes to framebuffer via shellframe_fb_put.  Visual column count is tracked
+# explicitly (not ${#char}).  attrs is an ANSI prefix applied to every cell.
 _shellframe_panel_hline() {
     local _row="$1" _col="$2" _width="$3" _lc="$4" _fc="$5" _rc="$6"
-    local _title="${7:-}" _talign="${8:-left}"
+    local _title="${7:-}" _talign="${8:-left}" _attrs="${9:-}"
 
     # Inner fill space = width - 2  (one col for each corner character)
     local _inner=$(( _width - 2 ))
+    local _c="$_col"
 
-    printf '\033[%d;%dH' "$_row" "$_col" >&3
-    printf '%s' "$_lc" >&3
+    shellframe_fb_put "$_row" "$_c" "${_attrs}${_lc}"; (( _c++ ))
 
     if [[ -z "$_title" || $_inner -le 2 ]]; then
         # No title or no room: plain fill
         local _k=0
         while (( _k < _inner )); do
-            printf '%s' "$_fc" >&3
+            shellframe_fb_put "$_row" "$_c" "${_attrs}${_fc}"; (( _c++ ))
             (( _k++ ))
         done
     else
@@ -132,13 +133,23 @@ _shellframe_panel_hline() {
         esac
 
         local _k=0
-        while (( _k < _lf )); do printf '%s' "$_fc" >&3; (( _k++ )); done
-        printf '%s' "$_ts" >&3
+        while (( _k < _lf )); do
+            shellframe_fb_put "$_row" "$_c" "${_attrs}${_fc}"; (( _c++ ))
+            (( _k++ ))
+        done
+        local _ti=0 _tlen="${#_ts}"
+        while (( _ti < _tlen )); do
+            shellframe_fb_put "$_row" "$_c" "${_attrs}${_ts:$_ti:1}"; (( _c++ ))
+            (( _ti++ ))
+        done
         _k=0
-        while (( _k < _rf )); do printf '%s' "$_fc" >&3; (( _k++ )); done
+        while (( _k < _rf )); do
+            shellframe_fb_put "$_row" "$_c" "${_attrs}${_fc}"; (( _c++ ))
+            (( _k++ ))
+        done
     fi
 
-    printf '%s' "$_rc" >&3
+    shellframe_fb_put "$_row" "$_c" "${_attrs}${_rc}"
 }
 
 # ── shellframe_panel_render ────────────────────────────────────────────────────
@@ -163,50 +174,39 @@ shellframe_panel_render() {
         _off="${SHELLFRAME_RESET}"
     fi
 
-    # Top border (with optional title)
-    printf '%s' "$_on" >&3
-
     local _mode="${SHELLFRAME_PANEL_MODE:-framed}"
     if [[ "$_mode" == "windowed" ]]; then
         # Top border: no title embedded
-        _shellframe_panel_hline "$_top" "$_left" "$_width" "$_tl" "$_hr" "$_tr"
+        _shellframe_panel_hline "$_top" "$_left" "$_width" "$_tl" "$_hr" "$_tr" "" "left" "$_on"
 
         # Title bar row: full-width colored row immediately inside top border
         local _title_row=$(( _top + _border ))
         local _title_bg="${SHELLFRAME_PANEL_TITLE_BG:-}"
-        local _title_rst="${SHELLFRAME_RESET:-$'\033[0m'}"
         local _title_text=" ${_title}"
         local _title_tlen=$(( ${#_title} + 1 ))
         local _inner_w=$(( _width - _border * 2 ))
         local _title_pad=$(( _inner_w - _title_tlen ))
         (( _title_pad < 0 )) && _title_pad=0
-        local _title_spaces
-        printf -v _title_spaces '%*s' "$_title_pad" ''
-        printf '\033[%d;%dH%s%s%s%s' \
-            "$_title_row" "$(( _left + _border ))" \
-            "$_title_bg" "$_title_text" "$_title_spaces" "$_title_rst" >&3
-        printf '\033[%d;%dH%s' \
-            "$_title_row" "$(( _left + _width - 1 ))" \
-            "${_on}${_vr}${_off}" >&3
+        local _title_col=$(( _left + _border ))
+        shellframe_fb_print "$_title_row" "$_title_col" "$_title_text" "$_title_bg"
+        (( _title_col += _title_tlen ))
+        shellframe_fb_fill  "$_title_row" "$_title_col" "$_title_pad" " " "$_title_bg"
+        shellframe_fb_put   "$_title_row" "$(( _left + _width - 1 ))" "${_on}${_vr}"
     else
         # framed mode: title embedded in top border line (existing behaviour)
-        _shellframe_panel_hline "$_top" "$_left" "$_width" "$_tl" "$_hr" "$_tr" "$_title" "$_talign"
+        _shellframe_panel_hline "$_top" "$_left" "$_width" "$_tl" "$_hr" "$_tr" "$_title" "$_talign" "$_on"
     fi
 
     # Side borders
     local _r
     for (( _r=1; _r<_height-1; _r++ )); do
         local _row=$(( _top + _r ))
-        printf '\033[%d;%dH%s' "$_row" "$_left" "$_vr" >&3
-        printf '\033[%d;%dH%s' "$_row" "$(( _left + _width - 1 ))" "$_vr" >&3
+        shellframe_fb_put "$_row" "$_left"                    "${_on}${_vr}"
+        shellframe_fb_put "$_row" "$(( _left + _width - 1 ))" "${_on}${_vr}"
     done
 
     # Bottom border
-    _shellframe_panel_hline "$(( _top + _height - 1 ))" "$_left" "$_width" "$_bl" "$_hr" "$_br"
-    printf '%s' "$_off" >&3
-
-    # Leave cursor at last row, column left (component contract)
-    printf '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left" >&3
+    _shellframe_panel_hline "$(( _top + _height - 1 ))" "$_left" "$_width" "$_bl" "$_hr" "$_br" "" "left" "$_on"
 }
 
 # ── shellframe_panel_inner ─────────────────────────────────────────────────────

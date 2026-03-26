@@ -9,6 +9,7 @@ source "$SHELLFRAME_DIR/src/clip.sh"
 source "$SHELLFRAME_DIR/src/draw.sh"
 source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/cursor.sh"
+source "$SHELLFRAME_DIR/src/screen.sh"
 source "$SHELLFRAME_DIR/src/widgets/input-field.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
@@ -181,10 +182,13 @@ _render_field() {
     local _out
     _out=$(mktemp "${TMPDIR:-/tmp}/sf-test-field.XXXXXX")
     trap '{ exec 3>&- 2>/dev/null || true; rm -f "$_out"; }' RETURN
+    _SF_FRAME_PREV=()
+    shellframe_fb_frame_start 1 "$_width"
     exec 3>"$_out"
     shellframe_field_render "$_top" "$_left" "$_width"
+    shellframe_screen_flush
     exec 3>&-
-    sed 's/\033\[[0-9;]*m//g; s/\033\[[0-9;]*[A-Za-z]//g' "$_out"
+    tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g'
 }
 
 ptyunit_test_begin "field_render: placeholder shown when empty and unfocused"

@@ -7,6 +7,7 @@ TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SHELLFRAME_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 source "$SHELLFRAME_DIR/src/clip.sh"
+source "$SHELLFRAME_DIR/src/screen.sh"
 source "$SHELLFRAME_DIR/src/panel.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
@@ -142,10 +143,12 @@ SHELLFRAME_PANEL_STYLE="single"
 SHELLFRAME_PANEL_TITLE=""
 SHELLFRAME_PANEL_MODE="framed"
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 5 20
 exec 3>"$_out"
 shellframe_panel_render 1 1 20 5
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "┌"
 rm -f "$_out"
 
@@ -154,10 +157,12 @@ SHELLFRAME_PANEL_STYLE="double"
 SHELLFRAME_PANEL_TITLE=""
 SHELLFRAME_PANEL_MODE="framed"
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 5 20
 exec 3>"$_out"
 shellframe_panel_render 1 1 20 5
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "╔"
 rm -f "$_out"
 
@@ -166,10 +171,12 @@ SHELLFRAME_PANEL_STYLE="rounded"
 SHELLFRAME_PANEL_TITLE=""
 SHELLFRAME_PANEL_MODE="framed"
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 5 20
 exec 3>"$_out"
 shellframe_panel_render 1 1 20 5
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "╭"
 rm -f "$_out"
 
@@ -178,10 +185,12 @@ SHELLFRAME_PANEL_STYLE="none"
 SHELLFRAME_PANEL_TITLE=""
 SHELLFRAME_PANEL_MODE="framed"
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 5 20
 exec 3>"$_out"
 shellframe_panel_render 1 1 20 5
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_not_contains "$_content" "┌"
 assert_not_contains "$_content" "╔"
 rm -f "$_out"
@@ -192,10 +201,12 @@ SHELLFRAME_PANEL_TITLE="MyTitle"
 SHELLFRAME_PANEL_TITLE_ALIGN="left"
 SHELLFRAME_PANEL_MODE="framed"
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 5 30
 exec 3>"$_out"
 shellframe_panel_render 1 1 30 5
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "MyTitle"
 rm -f "$_out"
 
@@ -205,10 +216,12 @@ SHELLFRAME_PANEL_TITLE="WinTitle"
 SHELLFRAME_PANEL_MODE="windowed"
 SHELLFRAME_PANEL_TITLE_BG=""
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 6 30
 exec 3>"$_out"
 shellframe_panel_render 1 1 30 6
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "WinTitle"
 rm -f "$_out"
 

@@ -53,7 +53,7 @@ shellframe_tabbar_render() {
     local _n=${#SHELLFRAME_TABBAR_LABELS[@]}
 
     # Clear the row
-    printf '\033[%d;%dH\033[2K' "$_top" "$_left" >&3
+    shellframe_fb_fill "$_top" "$_left" "$_width"
 
     [[ $_n -eq 0 ]] && return 0
 
@@ -64,12 +64,8 @@ shellframe_tabbar_render() {
     local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
     local _bg="${SHELLFRAME_TABBAR_BG:-$_rev}"
     local _bold="${SHELLFRAME_BOLD:-$'\033[1m'}"
-    local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
-    local _focused="${SHELLFRAME_TABBAR_FOCUSED:-0}"
 
-    printf '\033[%d;%dH' "$_top" "$_left" >&3
-
-    local _remaining="$_width" _i
+    local _remaining="$_width" _c="$_left" _i
     for (( _i=0; _i<_n; _i++ )); do
         (( _remaining <= 0 )) && break
 
@@ -95,33 +91,23 @@ shellframe_tabbar_render() {
         # Active tab: bold, default background (clear).
         # Inactive tabs: _bg (reverse video by default, overridable via SHELLFRAME_TABBAR_BG).
         if (( _i == _active )); then
-            printf '%s%s%s' "$_bold" "$_tab" "$_rst" >&3
+            shellframe_fb_print "$_top" "$_c" "$_tab" "$_bold"
         else
-            printf '%s%s%s' "$_bg" "$_tab" "$_rst" >&3
+            shellframe_fb_print "$_top" "$_c" "$_tab" "$_bg"
         fi
-
+        (( _c += _tlen ))
         (( _remaining -= _tlen ))
 
         # Separator between tabs (1 terminal column)
         if (( _i < _n-1 && _remaining > 0 )); then
-            printf '%s' "$_SHELLFRAME_TABBAR_SEP" >&3
+            shellframe_fb_put "$_top" "$_c" "$_SHELLFRAME_TABBAR_SEP"
+            (( _c++ ))
             (( _remaining-- ))
         fi
     done
 
     # Fill remaining space with _bg to complete the solid bar.
-    if (( _remaining > 0 )); then
-        printf '%s' "$_bg" >&3
-        local _k=0
-        while (( _k < _remaining )); do
-            printf ' ' >&3
-            (( _k++ ))
-        done
-        printf '%s' "$_rst" >&3
-    fi
-
-    # Leave cursor at start of row (component contract)
-    printf '\033[%d;%dH' "$_top" "$_left" >&3
+    (( _remaining > 0 )) && shellframe_fb_fill "$_top" "$_c" "$_remaining" " " "$_bg"
 }
 
 # ── shellframe_tabbar_on_key ────────────────────────────────────────────────

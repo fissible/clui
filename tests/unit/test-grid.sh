@@ -10,6 +10,7 @@ source "$SHELLFRAME_DIR/src/draw.sh"
 source "$SHELLFRAME_DIR/src/input.sh"
 source "$SHELLFRAME_DIR/src/selection.sh"
 source "$SHELLFRAME_DIR/src/scroll.sh"
+source "$SHELLFRAME_DIR/src/screen.sh"
 source "$SHELLFRAME_DIR/src/widgets/grid.sh"
 source "$PTYUNIT_HOME/assert.sh"
 
@@ -321,10 +322,12 @@ assert_output "0" shellframe_sel_cursor "gpk2"
 ptyunit_test_begin "grid_render: renders header labels to fd 3"
 _reset_grid
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 50
 exec 3>"$_out"
 shellframe_grid_render 1 1 50 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Name"
 assert_contains "$_content" "Age"
 rm -f "$_out"
@@ -332,10 +335,12 @@ rm -f "$_out"
 ptyunit_test_begin "grid_render: renders data cell values to fd 3"
 _reset_grid
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 50
 exec 3>"$_out"
 shellframe_grid_render 1 1 50 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Alice"
 assert_contains "$_content" "Bob"
 rm -f "$_out"
@@ -351,10 +356,12 @@ SHELLFRAME_GRID_MULTISELECT=0
 SHELLFRAME_GRID_FOCUSED=0
 shellframe_grid_init "gnh" 5
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 5 30
 exec 3>"$_out"
 shellframe_grid_render 1 1 30 5 "gnh"
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "foo"
 rm -f "$_out"
 
@@ -370,10 +377,12 @@ SHELLFRAME_GRID_MULTISELECT=0
 SHELLFRAME_GRID_FOCUSED=0
 shellframe_grid_init "gpkr" 5
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 6 40
 exec 3>"$_out"
 shellframe_grid_render 1 1 40 6
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "┃"
 rm -f "$_out"
 
@@ -381,21 +390,25 @@ ptyunit_test_begin "grid_render: multiselect shows checkbox prefix"
 _reset_grid
 SHELLFRAME_GRID_MULTISELECT=1
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 60
 exec 3>"$_out"
 shellframe_grid_render 1 1 60 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
-assert_contains "$_content" "[ ]"
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
+assert_contains "$_content" "[]"
 rm -f "$_out"
 
 ptyunit_test_begin "grid_render: h-scroll > 0 skips first column"
 _reset_grid
 shellframe_scroll_move "g" right 1
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 50
 exec 3>"$_out"
 shellframe_grid_render 1 1 50 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Age"
 rm -f "$_out"
 
@@ -405,11 +418,13 @@ ptyunit_test_begin "grid_render: right-align pads numeric cells on left"
 _reset_grid
 SHELLFRAME_GRID_COL_ALIGN=(left right left)   # Age column → right
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 50
 exec 3>"$_out"
 shellframe_grid_render 1 1 50 10
+shellframe_screen_flush
 exec 3>&-
 # Strip ANSI, find the 'Age' column area — value '30' should appear with leading spaces
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "30"   # value still rendered
 rm -f "$_out"
 
@@ -417,10 +432,12 @@ ptyunit_test_begin "grid_render: COL_ALIGN defaults to left when unset"
 _reset_grid
 SHELLFRAME_GRID_COL_ALIGN=()
 _out=$(mktemp)
+_SF_FRAME_PREV=(); shellframe_fb_frame_start 10 50
 exec 3>"$_out"
 shellframe_grid_render 1 1 50 10
+shellframe_screen_flush
 exec 3>&-
-_content=$(sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_out")
+_content=$(tr -d '\033' < "$_out" | sed 's/\[[0-9;]*[A-Za-z]//g')
 assert_contains "$_content" "Alice"   # left-aligned text still rendered
 rm -f "$_out"
 

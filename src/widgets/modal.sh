@@ -94,10 +94,9 @@ _shellframe_modal_render_buttons() {
     local _row="$1" _left="$2" _inner_w="$3" _active="$4"
     local _n_btns=${#SHELLFRAME_MODAL_BUTTONS[@]}
     local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
-    local _rst="${SHELLFRAME_RESET:-$'\033[0m'}"
 
     # Clear the row
-    printf '\033[%d;%dH\033[2K' "$_row" "$_left" >&3
+    shellframe_fb_fill "$_row" "$_left" "$_inner_w"
 
     (( _n_btns == 0 )) && return
 
@@ -117,16 +116,19 @@ _shellframe_modal_render_buttons() {
     local _pad=$(( (_inner_w - _total_w) / 2 ))
     (( _pad < 0 )) && _pad=0
 
-    printf '\033[%d;%dH' "$_row" "$(( _left + _pad ))" >&3
-
+    local _c=$(( _left + _pad ))
     local _i
     for (( _i=0; _i<_n_btns; _i++ )); do
-        (( _i > 0 )) && printf ' ' >&3
-        if (( _i == _active )); then
-            printf '%s%s%s' "$_rev" "${_btn_strs[$_i]}" "$_rst" >&3
-        else
-            printf '%s' "${_btn_strs[$_i]}" >&3
+        if (( _i > 0 )); then
+            shellframe_fb_put "$_row" "$_c" " "; (( _c++ ))
         fi
+        local _bs="${_btn_strs[$_i]}"
+        if (( _i == _active )); then
+            shellframe_fb_print "$_row" "$_c" "$_bs" "$_rev"
+        else
+            shellframe_fb_print "$_row" "$_c" "$_bs"
+        fi
+        (( _c += ${#_bs} ))
     done
 }
 
@@ -240,7 +242,7 @@ shellframe_modal_render() {
     # Clear inner area
     local _ir
     for (( _ir=0; _ir<_inner_h; _ir++ )); do
-        printf '\033[%d;%dH\033[2K' "$(( _inner_top + _ir ))" "$_inner_left" >&3
+        shellframe_fb_fill "$(( _inner_top + _ir ))" "$_inner_left" "$_inner_w"
     done
 
     # ── Render message body (rows 1..n, with 2-char side margins) ──
@@ -256,7 +258,7 @@ shellframe_modal_render() {
             if (( _msg_row < _inner_top + _inner_h - 1 )); then
                 local _clipped
                 _clipped=$(shellframe_str_clip_ellipsis "$_line" "$_line" "$_msg_avail")
-                printf '\033[%d;%dH%s' "$_msg_row" "$_msg_col" "$_clipped" >&3
+                shellframe_fb_print "$_msg_row" "$_msg_col" "$_clipped"
             fi
             (( _msg_row++ ))
         done < <(printf '%s\n' "$_msg")
@@ -285,9 +287,6 @@ shellframe_modal_render() {
     if (( _btn_row >= _inner_top )); then
         _shellframe_modal_render_buttons "$_btn_row" "$_inner_left" "$_inner_w" "$_active"
     fi
-
-    # Leave cursor at bottom-left of modal per component contract
-    printf '\033[%d;%dH' "$(( _modal_top + _modal_h - 1 ))" "$_modal_left" >&3
 }
 
 # ── shellframe_modal_on_key ───────────────────────────────────────────────────
