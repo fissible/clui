@@ -317,6 +317,11 @@ _shellframe_shell_draw() {
 
     # Flush only changed cells to the terminal
     shellframe_screen_flush
+
+    # Write any editor content that was deferred past screen_flush (to prevent
+    # the FB-diff erasure pass from overwriting direct-draw editor output).
+    [[ -n "${_SHELLFRAME_EDITOR_DEFERRED_BUF:-}" ]] && \
+        printf '%s' "$_SHELLFRAME_EDITOR_DEFERRED_BUF" >&3
 }
 
 # ── _shellframe_shell_draw_if_dirty ──────────────────────────────────────────

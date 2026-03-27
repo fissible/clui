@@ -125,41 +125,47 @@ _shellframe_ed_delete_line_at() {
 
 # Compute "start:len" pairs for visual segments of one line (stdout).
 _shellframe_ed_line_segments() {
-    local _line="$1" _width="$2"
+    local _line="$1" _width="$2" _out_var="${3:-}"
     local _len="${#_line}"
+    local _result=""
 
-    if (( _len == 0 )); then printf '0:0'; return; fi
-    if (( _width <= 0 || _len <= _width )); then printf '0:%d' "$_len"; return; fi
+    if (( _len == 0 )); then _result="0:0"
+    elif (( _width <= 0 || _len <= _width )); then printf -v _result '0:%d' "$_len"
+    else
+        local _pos=0
+        while (( _pos < _len )); do
+            local _remaining="${_line:$_pos}"
+            local _rlen="${#_remaining}"
 
-    local _result="" _pos=0
-    while (( _pos < _len )); do
-        local _remaining="${_line:$_pos}"
-        local _rlen="${#_remaining}"
-
-        if (( _rlen <= _width )); then
-            _result="${_result:+$_result }${_pos}:${_rlen}"
-            break
-        fi
-
-        # Find last space at or before _width; include it in this segment
-        local _seg_len="$_width"
-        local _next_pos=$(( _pos + _width ))
-        local _i=$(( _width - 1 ))
-        while (( _i >= 0 )); do
-            if [[ "${_remaining:$_i:1}" == " " ]]; then
-                _seg_len=$(( _i + 1 ))
-                _next_pos=$(( _pos + _i + 1 ))
+            if (( _rlen <= _width )); then
+                _result="${_result:+$_result }${_pos}:${_rlen}"
                 break
             fi
-            (( _i-- ))
+
+            # Find last space at or before _width; include it in this segment
+            local _seg_len="$_width"
+            local _next_pos=$(( _pos + _width ))
+            local _i=$(( _width - 1 ))
+            while (( _i >= 0 )); do
+                if [[ "${_remaining:$_i:1}" == " " ]]; then
+                    _seg_len=$(( _i + 1 ))
+                    _next_pos=$(( _pos + _i + 1 ))
+                    break
+                fi
+                (( _i-- ))
+            done
+
+            _result="${_result:+$_result }${_pos}:${_seg_len}"
+            _pos="$_next_pos"
         done
+        [[ -z "$_result" ]] && _result="0:0"
+    fi
 
-        _result="${_result:+$_result }${_pos}:${_seg_len}"
-        _pos="$_next_pos"
-    done
-
-    [[ -z "$_result" ]] && _result="0:0"
-    printf '%s' "$_result"
+    if [[ -n "$_out_var" ]]; then
+        printf -v "$_out_var" '%s' "$_result"
+    else
+        printf '%s' "$_result"
+    fi
 }
 
 # Build (or rebuild) the vmap for the current content and viewport width.
@@ -175,7 +181,7 @@ _shellframe_ed_build_vmap() {
         local _line
         _shellframe_ed_get_line "$_ctx" "$_i" _line
         local _segs
-        _segs=$(_shellframe_ed_line_segments "$_line" "$_width")
+        _shellframe_ed_line_segments "$_line" "$_width" _segs
         local _old_IFS="$IFS"
         local _seg_arr
         IFS=' ' read -r -a _seg_arr <<< "$_segs"
@@ -283,7 +289,7 @@ _shellframe_ed_ensure_visible() {
         fi
 
         local _total_vrows
-        _total_vrows=$(_shellframe_ed_vrow_count "$_ctx")
+        _shellframe_ed_vrow_count "$_ctx" _total_vrows
         local _max_vtop=$(( _total_vrows - _vrows ))
         (( _max_vtop < 0 )) && _max_vtop=0
     else
@@ -1006,7 +1012,18 @@ shellframe_editor_render() {
 
     printf -v _tmp '\033[%d;%dH' "$(( _top + _height - 1 ))" "$_left"
     _buf+="$_tmp"
-    printf '%s' "$_buf" >&3
+
+    # Claim editor rows in the framebuffer so shellframe_screen_flush won't
+    # treat prior-frame content (e.g. grid cells from a data tab) at these
+    # positions as erasures and overwrite our output with terminal-default spaces.
+    local _fb_r
+    for (( _fb_r=0; _fb_r<_height; _fb_r++ )); do
+        shellframe_fb_fill "$(( _top + _fb_r ))" "$_left" "$_width" " " "${SHELLFRAME_EDITOR_BG:-}"
+    done
+
+    # Defer the write until after shellframe_screen_flush so the FB-diff
+    # erasures don't stomp our content.
+    _SHELLFRAME_EDITOR_DEFERRED_BUF+="$_buf"
 }
 
 # ── shellframe_editor_on_key ──────────────────────────────────────────────────

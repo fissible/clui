@@ -100,6 +100,7 @@ shellframe_fb_frame_start() {
     _SF_FRAME_COLS="${2:-80}"
     _SF_FRAME_CURR=()
     _SF_FRAME_DIRTY=()
+    _SHELLFRAME_EDITOR_DEFERRED_BUF=""
 }
 
 # shellframe_fb_put row col cell
