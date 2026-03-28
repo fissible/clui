@@ -317,3 +317,10 @@ _Last updated: 2026-03-16 (session 5)_
   - **Crash diagnostic trap**: `bin/shql` EXIT trap logs crash context to `/tmp/shql-crash.log` when exit code is non-zero.
   - **Scroll crash**: User reported app crashing on data table scroll after scrollbar+footer changes. Extensive investigation found no `set -u` violation. Defensive guards added (min width/height for scrollbar, `:-` defaults). Crash NOT yet verified as fixed — user needs to test.
   - 1370/1370 shellframe assertions pass, 403/403 shellql unit assertions pass.
+- **Welcome tiles + mouse fixes session (2026-03-28)**:
+  - **Mouse-driven screen transitions**: `src/shell.sh` event loop now checks `_SHELLFRAME_SHELL_NEXT` after mouse event dispatch. Previously only the keyboard rc=2 path handled screen transitions — mouse clicks that set `_SHELLFRAME_SHELL_NEXT` were silently ignored.
+  - **Enter key → rc=2 convention**: Welcome tiles `on_key` now returns `rc=2` for Enter so the shell loop's action+transition path fires. Calling `_action` directly and returning `rc=0` bypassed the transition check.
+  - **Context menu release fix**: `shellframe_cmenu_on_mouse` returned `rc=1` (outside-click) for release events, causing consumers to dismiss the menu on Shift+click button release. Now returns `rc=0` (no-op) for non-press events.
+  - **Modal mouse support**: New `shellframe_modal_on_mouse` — hit-tests centered button row, returns `rc=2` with `SHELLFRAME_MODAL_RESULT` on button click. Clicks outside modal bounds dismiss with `result=-1`. Wired into welcome screen delete confirmation.
+  - **Welcome tile background fix**: All `shellframe_fb_fill` calls in tile render now use `$SHQL_THEME_CONTENT_BG` instead of `""` to prevent blue color bleed from header/footer.
+  - 1370/1370 shellframe assertions pass, 446/446 shellql assertions pass.
