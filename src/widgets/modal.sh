@@ -334,6 +334,85 @@ shellframe_modal_on_key() {
     return 1
 }
 
+# ── shellframe_modal_on_mouse ─────────────────────────────────────────────────
+
+# shellframe_modal_on_mouse button action mrow mcol rtop rleft rwidth rheight
+#   Returns:
+#     0 — handled (click inside modal, button highlight or no-op)
+#     1 — click outside modal bounds (consumer may dismiss)
+#     2 — button clicked: SHELLFRAME_MODAL_RESULT is set
+shellframe_modal_on_mouse() {
+    local _button="$1" _action="$2" _mrow="$3" _mcol="$4"
+    local _rtop="$5" _rleft="$6" _rwidth="$7" _rheight="$8"
+
+    [[ "$_action" != "press" ]] && return 0
+
+    # Compute modal bounds (same logic as render)
+    local _modal_w _modal_h
+    _shellframe_modal_dims "$_rwidth" "$_rheight" _modal_w _modal_h
+
+    local _modal_top=$(( _rtop  + (_rheight - _modal_h) / 2 ))
+    local _modal_left=$(( _rleft + (_rwidth  - _modal_w) / 2 ))
+
+    # Click outside modal → dismiss
+    if (( _mrow < _modal_top || _mrow >= _modal_top + _modal_h ||
+          _mcol < _modal_left || _mcol >= _modal_left + _modal_w )); then
+        SHELLFRAME_MODAL_RESULT=-1
+        return 2
+    fi
+
+    # Only handle left-click on buttons
+    (( _button > 2 )) && return 0
+
+    # Compute inner region
+    local _style="${SHELLFRAME_MODAL_STYLE:-single}"
+    local _border=0
+    [[ "$_style" != "none" ]] && _border=1
+    local _title_row=0
+    [[ "${SHELLFRAME_PANEL_MODE:-framed}" == "windowed" ]] && _title_row=1
+    local _inner_top=$(( _modal_top + _border + _title_row ))
+    local _inner_left=$(( _modal_left + _border ))
+    local _inner_w=$(( _modal_w - _border * 2 ))
+    local _inner_h=$(( _modal_h - _border * 2 - _title_row ))
+
+    # Button row is the last inner row
+    local _btn_row=$(( _inner_top + _inner_h - 1 ))
+    (( _mrow != _btn_row )) && return 0
+
+    # Hit-test buttons (same centering logic as _shellframe_modal_render_buttons)
+    local _n_btns=${#SHELLFRAME_MODAL_BUTTONS[@]}
+    (( _n_btns == 0 )) && return 0
+
+    local _total_w=0
+    local _btn_widths=()
+    local _b
+    for _b in "${SHELLFRAME_MODAL_BUTTONS[@]+"${SHELLFRAME_MODAL_BUTTONS[@]}"}"; do
+        local _bw=$(( ${#_b} + 4 ))   # "[ " + label + " ]"
+        _btn_widths+=("$_bw")
+        (( _total_w += _bw ))
+    done
+    (( _n_btns > 1 )) && (( _total_w += _n_btns - 1 ))
+
+    local _pad=$(( (_inner_w - _total_w) / 2 ))
+    (( _pad < 0 )) && _pad=0
+
+    local _c=$(( _inner_left + _pad ))
+    local _i
+    for (( _i=0; _i<_n_btns; _i++ )); do
+        (( _i > 0 )) && (( _c++ ))   # space between buttons
+        local _bw="${_btn_widths[$_i]}"
+        if (( _mcol >= _c && _mcol < _c + _bw )); then
+            SHELLFRAME_MODAL_ACTIVE_BTN="$_i"
+            SHELLFRAME_MODAL_RESULT="$_i"
+            shellframe_shell_mark_dirty
+            return 2
+        fi
+        (( _c += _bw ))
+    done
+
+    return 0
+}
+
 # ── shellframe_modal_on_focus ─────────────────────────────────────────────────
 
 shellframe_modal_on_focus() {
