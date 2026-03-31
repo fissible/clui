@@ -270,24 +270,17 @@ _shellframe_shell_draw() {
     # Start a fresh framebuffer frame (resets CURR + DIRTY; keeps PREV)
     shellframe_fb_frame_start "$_SHELLFRAME_SHELL_ROWS" "$_SHELLFRAME_SHELL_COLS"
 
-    # Apply any pending focus request to the PREVIOUS cycle's ring
-    # so on_focus sees the correct owner before regions are re-registered.
-    if [[ -n "$_SHELLFRAME_SHELL_FOCUS_REQUEST" ]]; then
-        local _req_name="$_SHELLFRAME_SHELL_FOCUS_REQUEST"
-        local _req_found=0 _ri
-        for _ri in "${!_SHELLFRAME_SHELL_FOCUS_RING[@]}"; do
-            if [[ "${_SHELLFRAME_SHELL_FOCUS_RING[$_ri]}" == "$_req_name" ]]; then
-                _SHELLFRAME_SHELL_FOCUS_IDX=$_ri
-                _SHELLFRAME_SHELL_FOCUS_REQUEST=""
-                _req_found=1
-                break
-            fi
-        done
-        # If not found in old ring, leave the request for focus_init
-        # (the region may be registered in the upcoming render)
-    fi
+    # Re-register regions from scratch (layout uses updated focus state)
+    _SHELLFRAME_SHELL_REGIONS=()
+    shellframe_widget_clear    # hitbox in sync with region re-registration
+    "${_prefix}_${_screen}_render"
 
-    # Fire on_focus using the (now updated) focus ring
+    # Rebuild focus ring from freshly registered regions, applying any pending
+    # focus request (including requests for regions that were previously nofocus).
+    _shellframe_shell_focus_init
+
+    # Fire on_focus using the new ring so every region sees the correct focused
+    # state before it renders — including regions that just became focusable.
     local _focused
     _shellframe_shell_focus_owner _focused
     local _entry _n
@@ -301,14 +294,6 @@ _shellframe_shell_draw() {
             fi
         fi
     done
-
-    # Re-register regions from scratch (layout uses updated focus state)
-    _SHELLFRAME_SHELL_REGIONS=()
-    shellframe_widget_clear    # hitbox in sync with region re-registration
-    "${_prefix}_${_screen}_render"
-
-    # Rebuild focus ring, preserving current focus owner by name
-    _shellframe_shell_focus_init
 
     # Render each region
     for _entry in "${_SHELLFRAME_SHELL_REGIONS[@]+"${_SHELLFRAME_SHELL_REGIONS[@]}"}"; do
