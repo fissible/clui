@@ -258,6 +258,15 @@ _shellframe_shell_draw() {
     # Refresh terminal size once per draw (no per-call stty forks)
     _shellframe_shell_refresh_size
 
+    # Tick toast TTLs; expired toasts are removed and a redraw is scheduled
+    if declare -f shellframe_toast_tick >/dev/null 2>&1; then
+        local _pre_toast_n=${#_SHELLFRAME_TOAST_QUEUE[@]}
+        shellframe_toast_tick
+        if (( ${#_SHELLFRAME_TOAST_QUEUE[@]} < _pre_toast_n )); then
+            _SHELLFRAME_SHELL_DIRTY=1
+        fi
+    fi
+
     # Start a fresh framebuffer frame (resets CURR + DIRTY; keeps PREV)
     shellframe_fb_frame_start "$_SHELLFRAME_SHELL_ROWS" "$_SHELLFRAME_SHELL_COLS"
 
@@ -481,7 +490,14 @@ shellframe_shell() {
 
             local _key=""
             _shellframe_shell_read_key _key
-            [[ -z "$_key" ]] && continue   # timeout or resize — loop back
+            if [[ -z "$_key" ]]; then
+                # Timeout: tick toasts so they expire even when user is idle
+                if (( ${#_SHELLFRAME_TOAST_QUEUE[@]} > 0 )); then
+                    shellframe_shell_mark_dirty
+                    _shellframe_shell_draw_if_dirty "$_prefix" "$_current"
+                fi
+                continue
+            fi
 
             # Check for resize after read returns
             if (( _SHELLFRAME_SHELL_RESIZED )); then

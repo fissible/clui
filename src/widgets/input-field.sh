@@ -45,6 +45,7 @@ SHELLFRAME_FIELD_PLACEHOLDER=""
 SHELLFRAME_FIELD_MASK=0
 SHELLFRAME_FIELD_FOCUSED=0
 SHELLFRAME_FIELD_FOCUSABLE=1
+SHELLFRAME_FIELD_BG=""          # optional background colour applied to field fills
 
 # ── shellframe_field_init ────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ shellframe_field_render() {
     shellframe_cur_pos  "$_ctx" _pos
 
     # Clear the row
-    shellframe_fb_fill "$_top" "$_left" "$_width"
+    shellframe_fb_fill "$_top" "$_left" "$_width" " " "${SHELLFRAME_FIELD_BG:-}"
 
     # Empty + unfocused: show placeholder
     if [[ -z "$_text" && $(( _focused )) -eq 0 && -n "$_placeholder" ]]; then
@@ -111,25 +112,26 @@ shellframe_field_render() {
 
     if (( _focused )); then
         local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
+        local _fbg="${SHELLFRAME_FIELD_BG:-}"
 
         # Text before cursor
-        shellframe_fb_print "$_top" "$_left" "${_vis:0:$_cur_vis}"
+        shellframe_fb_print "$_top" "$_left" "${_vis:0:$_cur_vis}" "$_fbg"
 
         # Cursor: highlight char at cursor pos, or a space if at end of text
         if (( _cur_vis < _vlen )); then
-            shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_rev}${_vis:$_cur_vis:1}"
-            shellframe_fb_print "$_top" "$(( _left + _cur_vis + 1 ))" "${_vis:$(( _cur_vis + 1 ))}"
+            shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_fbg}${_rev}${_vis:$_cur_vis:1}"
+            shellframe_fb_print "$_top" "$(( _left + _cur_vis + 1 ))" "${_vis:$(( _cur_vis + 1 ))}" "$_fbg"
         else
-            shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_rev} "
+            shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_fbg}${_rev} "
         fi
 
         # Pad remaining columns
         local _drawn=$(( _vlen < _width ? _vlen : _width ))
         (( _cur_vis >= _vlen )) && (( _drawn++ )) || true
-        shellframe_fb_fill "$_top" "$(( _left + _drawn ))" "$(( _width - _drawn ))"
+        shellframe_fb_fill "$_top" "$(( _left + _drawn ))" "$(( _width - _drawn ))" " " "$_fbg"
     else
-        shellframe_fb_print "$_top" "$_left" "$_vis"
-        shellframe_fb_fill  "$_top" "$(( _left + _vlen ))" "$(( _width - _vlen ))"
+        shellframe_fb_print "$_top" "$_left" "$_vis" "${SHELLFRAME_FIELD_BG:-}"
+        shellframe_fb_fill  "$_top" "$(( _left + _vlen ))" "$(( _width - _vlen ))" " " "${SHELLFRAME_FIELD_BG:-}"
     fi
 }
 

@@ -47,6 +47,7 @@
 #     Set inline error message. Empty string clears error.
 
 SHELLFRAME_FORM_FIELDS=()
+SHELLFRAME_FORM_BG=""   # optional background colour applied to every field row
 
 # ── shellframe_form_init ──────────────────────────────────────────────────────
 
@@ -244,30 +245,33 @@ shellframe_form_render() {
         # Label: "  label: "
         local _lbl_padded
         printf -v _lbl_padded '%-*s' "$_lw" "$_lbl"
-        local _lbl_style=""
-        (( _is_focused )) && _lbl_style="${SHELLFRAME_BOLD:-$'\033[1m'}"
+        local _lbl_style="${SHELLFRAME_FORM_BG:-}"
+        (( _is_focused )) && _lbl_style="${_lbl_style}${SHELLFRAME_BOLD:-$'\033[1m'}"
         shellframe_fb_print "$_row" "$(( _left + 2 ))" "${_lbl_padded}:" "$_lbl_style"
-        shellframe_fb_fill  "$_row" "$(( _left + 2 + _lw + 1 ))" 2 " "
+        shellframe_fb_fill  "$_row" "$(( _left + 2 + _lw + 1 ))" 2 " " "${SHELLFRAME_FORM_BG:-}"
 
         # Field value
         local _save_ctx="$SHELLFRAME_FIELD_CTX"
         local _save_foc="${SHELLFRAME_FIELD_FOCUSED:-0}"
         local _save_mask="${SHELLFRAME_FIELD_MASK:-0}"
+        local _save_fbg="${SHELLFRAME_FIELD_BG:-}"
         SHELLFRAME_FIELD_CTX="$_fctx"
         SHELLFRAME_FIELD_FOCUSED="$_is_focused"
         SHELLFRAME_FIELD_MASK=0
+        SHELLFRAME_FIELD_BG="${SHELLFRAME_FORM_BG:-}"
         [[ "$_type" == "password" ]] && SHELLFRAME_FIELD_MASK=1
         if [[ "$_type" == "readonly" ]]; then
             local _rtext=""
             shellframe_cur_text "$_fctx" _rtext
             local _gray="${SHELLFRAME_GRAY:-$'\033[2m'}"
-            shellframe_fb_print "$_row" "$_field_left" "$_rtext" "$_gray"
+            shellframe_fb_print "$_row" "$_field_left" "$_rtext" "${SHELLFRAME_FORM_BG:-}${_gray}"
         else
             shellframe_field_render "$_row" "$_field_left" "$_field_w" 1
         fi
         SHELLFRAME_FIELD_CTX="$_save_ctx"
         SHELLFRAME_FIELD_FOCUSED="$_save_foc"
         SHELLFRAME_FIELD_MASK="$_save_mask"
+        SHELLFRAME_FIELD_BG="$_save_fbg"
     done
 
     # Error row at bottom (if set)

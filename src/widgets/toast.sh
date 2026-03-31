@@ -27,7 +27,7 @@
 
 _SHELLFRAME_TOAST_QUEUE=()
 _SHELLFRAME_TOAST_MAX=3
-_SHELLFRAME_TOAST_DEFAULT_TTL=30
+_SHELLFRAME_TOAST_DEFAULT_TTL=5
 
 # ── shellframe_toast_clear ────────────────────────────────────────────────────
 
@@ -93,12 +93,14 @@ shellframe_toast_render() {
         local _style="${_rest%%$'\t'*}"
 
         # Style → color
+        # Callers may override SHELLFRAME_TOAST_*_COLOR to include a background
+        # (e.g. for dark themes). Falls back to plain foreground colours.
         local _color=""
         case "$_style" in
-            success) _color="${SHELLFRAME_GREEN:-$'\033[32m'}" ;;
-            error)   _color="${SHELLFRAME_RED:-$'\033[31m'}" ;;
-            warning) _color="${SHELLFRAME_YELLOW:-$'\033[33m'}" ;;
-            *)       _color="${SHELLFRAME_GRAY:-$'\033[2m'}" ;;
+            success) _color="${SHELLFRAME_TOAST_SUCCESS_COLOR:-${SHELLFRAME_GREEN:-$'\033[32m'}}" ;;
+            error)   _color="${SHELLFRAME_TOAST_ERROR_COLOR:-${SHELLFRAME_RED:-$'\033[31m'}}" ;;
+            warning) _color="${SHELLFRAME_TOAST_WARNING_COLOR:-${SHELLFRAME_YELLOW:-$'\033[33m'}}" ;;
+            *)       _color="${SHELLFRAME_TOAST_INFO_COLOR:-${SHELLFRAME_GRAY:-$'\033[2m'}}" ;;
         esac
 
         # Clip message to fit (accounting for 1 padding space each side)
