@@ -235,4 +235,12 @@ _SHELLFRAME_AC_PREFIX="fo"
 shellframe_ac_dismiss
 assert_eq "" "$_SHELLFRAME_AC_PREFIX"
 
+ptyunit_test_begin "ac_prefix: stops at non-word chars like @"
+_reset_ac
+shellframe_cur_init "pfspecial" "user@us"
+shellframe_ac_attach "pfspecial" "field"
+_pfx=""
+_shellframe_ac_prefix _pfx
+assert_eq "us" "$_pfx" "stops at @ boundary"
+
 ptyunit_test_summary

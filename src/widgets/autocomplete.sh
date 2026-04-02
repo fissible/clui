@@ -120,15 +120,10 @@ _shellframe_ac_prefix() {
     local _start="$_pos"
     while (( _start > 0 )); do
         local _ch="${_text:$(( _start - 1 )):1}"
-        if [[ "$_ch" =~ [a-zA-Z0-9_.\ -] ]]; then
-            # Exclude space explicitly — it's not a word char
-            if [[ "$_ch" == ' ' ]]; then
-                break
-            fi
-            (( _start-- ))
-        else
-            break
-        fi
+        case "$_ch" in
+            [a-zA-Z0-9_.\-]) (( _start-- )) ;;
+            *) break ;;
+        esac
     done
 
     local _prefix="${_text:$_start:$(( _pos - _start ))}"
