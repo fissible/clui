@@ -87,14 +87,15 @@ Start every new session by reading this file. Update task status here when work 
 
 ## Phase 6 — SQLite Integration (shellql)
 > Wire real sqlite3 behind the adapter seam.
+> **Tracking moved to `shellql/PLAN.md`.** All tasks completed 2026-03-22 (shellql#6–9).
 
 | # | Task                             | Effort | GH Issue | Status | Deps |
 |---|----------------------------------|--------|----------|--------|------|
-| 24 | SQLite adapter: `src/db.sh` (list, describe, fetch, query) | L | shellql#TBD | open | - |
-| 25 | Mock adapter: `src/db_mock.sh` (fixture data)              | S | shellql#TBD | open | - |
-| 26 | CLI entry point: `bin/shql` (arg parse + mode dispatch)    | M | shellql#TBD | open | 24 |
-| 27 | Discovery mode (recent/known databases)                    | S | shellql#TBD | open | 24,26 |
-| 28 | Integration tests (real sqlite3, all CLI modes)            | M | shellql#TBD | open | 24,26 |
+| 24 | SQLite adapter: `src/db.sh` (list, describe, fetch, query) | L | [shellql#7](https://github.com/fissible/shellql/issues/7) | closed | - |
+| 25 | Mock adapter: `src/db_mock.sh` (fixture data)              | S | [shellql#6](https://github.com/fissible/shellql/issues/6) | closed | - |
+| 26 | CLI entry point: `bin/shql` (arg parse + mode dispatch)    | M | [shellql#8](https://github.com/fissible/shellql/issues/8) | closed | 24 |
+| 27 | Discovery mode (recent/known databases)                    | S | (done inline) | closed | 24,26 |
+| 28 | Integration tests (real sqlite3, all CLI modes)            | M | [shellql#9](https://github.com/fissible/shellql/issues/9) | closed | 24,26 |
 
 ---
 
@@ -129,9 +130,9 @@ Start every new session by reading this file. Update task status here when work 
 
 | Milestone | Condition | Status |
 |-----------|-----------|--------|
-| **M1: Shellframe ready** | Phase 1–4 all closed | open |
+| **M1: Shellframe ready** | Phase 1–4 all closed | closed |
 | **M2: Mock app complete** | Phase 5 all closed, mock screens working | closed (5/5 screens done) |
-| **M3: ShellQL v0.1** | Phase 6 all closed, integration tests passing | open |
+| **M3: ShellQL v0.1** | Phase 6 all closed, integration tests passing | closed (tracked in shellql/PLAN.md) |
 | **M4: Platform enhancements** | Phase 7 all closed; mouse, diff rendering, full F-key support | closed |
 
 ---
@@ -329,3 +330,5 @@ _Last updated: 2026-03-16 (session 5)_
 - **diff-view framebuffer migration complete (2026-04-02)**: `src/widgets/diff-view.sh` migrated from manual `_buf` accumulation + `printf >&3` to row-based framebuffer API (`shellframe_fb_fill`, `shellframe_fb_print_ansi`). All three render paths migrated: `_shellframe_dv_render_pane` (per-row fb writes), `shellframe_diff_view_render` footer, `shellframe_diff_view_render_side` footer. Zero `>&3` writes remain — all composable widgets now use the framebuffer uniformly. Test helper `_dv_capture` updated to use `fb_frame_start` + `screen_flush`. 1323/1323 unit assertions pass.
   - Also committed: ANSI attribute reset fixes in `panel.sh`, `grid.sh`, `scrollbar.sh` — `\033[m`/`\033[39m`/`\033[22m\033[39m` after border/separator chars to prevent style bleed into adjacent cell content.
   - **Next**: PM decision — cut v0.4.0 release (`bash release.sh minor`), ShellQL Phase 6, or v1.0 issue specs.
+- **Autocomplete layer complete (2026-04-02)**: [shellframe#38](https://github.com/fissible/shellframe/issues/38) closed. New `src/widgets/autocomplete.sh` — composable autocomplete overlay for input-field and editor contexts. Provider callback contract (`provider_fn prefix out_array_name`), "auto" and "tab" trigger modes, popup delegated to `shellframe_cmenu_*`. Bug caught in final review: editor-mode accept wrote to `_SHELLFRAME_ED_${ctx}_LINE_${row}` — corrected to `_L${row}`. 62 unit assertions + 3 PTY integration tests + `examples/autocomplete.sh` + showcase entry. 1462/1462 assertions pass (1385 unit + 77 integration). Branch `feature/autocomplete-layer` merged to `main`. Issue #38 closed.
+  - **Next**: PM decision — cut v0.4.0 release (`bash release.sh minor`), start ShellQL DML work (shellql#13–17), or form widget (#36).

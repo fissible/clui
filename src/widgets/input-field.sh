@@ -114,13 +114,17 @@ shellframe_field_render() {
         local _rev="${SHELLFRAME_REVERSE:-$'\033[7m'}"
         local _fbg="${SHELLFRAME_FIELD_BG:-}"
 
+        # Reset prefix: \033[0m + bg ensures reverse video from cursor cell
+        # doesn't bleed into subsequent fragments (row is one concatenated string).
+        local _rst=$'\033[0m'"${_fbg}"
+
         # Text before cursor
         shellframe_fb_print "$_top" "$_left" "${_vis:0:$_cur_vis}" "$_fbg"
 
         # Cursor: highlight char at cursor pos, or a space if at end of text
         if (( _cur_vis < _vlen )); then
             shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_fbg}${_rev}${_vis:$_cur_vis:1}"
-            shellframe_fb_print "$_top" "$(( _left + _cur_vis + 1 ))" "${_vis:$(( _cur_vis + 1 ))}" "$_fbg"
+            shellframe_fb_print "$_top" "$(( _left + _cur_vis + 1 ))" "${_vis:$(( _cur_vis + 1 ))}" "$_rst"
         else
             shellframe_fb_put "$_top" "$(( _left + _cur_vis ))" "${_fbg}${_rev} "
         fi
@@ -128,7 +132,7 @@ shellframe_field_render() {
         # Pad remaining columns
         local _drawn=$(( _vlen < _width ? _vlen : _width ))
         (( _cur_vis >= _vlen )) && (( _drawn++ )) || true
-        shellframe_fb_fill "$_top" "$(( _left + _drawn ))" "$(( _width - _drawn ))" " " "$_fbg"
+        shellframe_fb_fill "$_top" "$(( _left + _drawn ))" "$(( _width - _drawn ))" " " "$_rst"
     else
         shellframe_fb_print "$_top" "$_left" "$_vis" "${SHELLFRAME_FIELD_BG:-}"
         shellframe_fb_fill  "$_top" "$(( _left + _vlen ))" "$(( _width - _vlen ))" " " "${SHELLFRAME_FIELD_BG:-}"
