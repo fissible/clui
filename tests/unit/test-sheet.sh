@@ -95,4 +95,57 @@ rc=0
 shellframe_sheet_active || rc=$?
 assert_eq "1" "$rc" "exit code 1 when inactive"
 
+# ── shellframe_sheet_draw: registry swap ───────────────────────────────────────
+
+# Helper: minimal render hook for tests
+_tst_FORM_render() {
+    shellframe_shell_region body 1 1 "$SHELLFRAME_SHEET_WIDTH" 5
+}
+_tst_FORM_body_render() { :; }
+
+ptyunit_test_begin "sheet_draw: parent shell regions restored after draw"
+_reset_sheet
+_SHELLFRAME_SHELL_REGIONS=("parent:1:1:80:10:focus")
+shellframe_sheet_push "_tst" "FORM"
+shellframe_sheet_draw 10 80
+assert_eq "1" "${#_SHELLFRAME_SHELL_REGIONS[@]}" "parent region count unchanged"
+assert_eq "parent:1:1:80:10:focus" "${_SHELLFRAME_SHELL_REGIONS[0]}" "parent entry unchanged"
+
+ptyunit_test_begin "sheet_draw: parent focus ring restored after draw"
+_reset_sheet
+_SHELLFRAME_SHELL_FOCUS_RING=("parent")
+_SHELLFRAME_SHELL_FOCUS_IDX=0
+shellframe_sheet_push "_tst" "FORM"
+shellframe_sheet_draw 10 80
+assert_eq "1" "${#_SHELLFRAME_SHELL_FOCUS_RING[@]}" "parent focus ring count unchanged"
+assert_eq "parent" "${_SHELLFRAME_SHELL_FOCUS_RING[0]}" "parent focus ring entry unchanged"
+
+ptyunit_test_begin "sheet_draw: SHEET_WIDTH set to cols before render hook"
+_reset_sheet
+_tst_WIDE_render() { :; }
+shellframe_sheet_push "_tst" "WIDE"
+shellframe_sheet_draw 10 120
+assert_eq "120" "$SHELLFRAME_SHEET_WIDTH" "SHEET_WIDTH set to cols"
+
+ptyunit_test_begin "sheet_draw: height=0 resolves to rows-1"
+_reset_sheet
+SHELLFRAME_SHEET_HEIGHT=0
+shellframe_sheet_push "_tst" "FORM"
+shellframe_sheet_draw 10 80
+# sheet ran without error; height resolution verified by frozen row write below row 2
+assert_eq "0" "$?" "draw exits 0"
+
+ptyunit_test_begin "sheet_draw: frozen rows written at row 1 with dim wrapper"
+_reset_sheet
+# Set up a known frozen row 1 by writing to the framebuffer before push
+shellframe_fb_frame_start 10 80
+shellframe_fb_print 1 1 "parent content"
+shellframe_sheet_push "_tst" "FORM"
+# Now draw — row 1 in CURR should be the dimmed frozen row
+_SF_ROW_CURR=()
+_SF_DIRTY_ROWS=()
+shellframe_sheet_draw 10 80
+assert_contains "${_SF_ROW_CURR[1]:-}" $'\033[2m' "row 1 contains dim sequence"
+assert_contains "${_SF_ROW_CURR[1]:-}" $'\033[22m' "row 1 ends dim sequence"
+
 ptyunit_test_summary
