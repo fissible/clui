@@ -486,3 +486,46 @@ printf 'Selected: %s\n' "$SHELLFRAME_MENUBAR_RESULT"
 `@VARNAME:Label` declares a submenu backed by `SHELLFRAME_MENU_VARNAME`.
 Result path in `SHELLFRAME_MENUBAR_RESULT` (e.g. `File|Recent Files|demo.db`).
 Empty result = dismissed with Esc.
+
+---
+
+## Autocomplete
+
+Layers a filtered suggestion popup on any input field or editor.
+Consumer provides a callback; shellframe handles the UI.
+
+```
+┌──────────────────────────────────────┐
+│ Table name: us█                      │
+│              ┌──────────────┐        │
+│              │ users        │        │
+│              │ user_roles   │        │
+│              └──────────────┘        │
+│                                      │
+│  Tab: complete  Esc: dismiss         │
+└──────────────────────────────────────┘
+```
+
+```bash
+# Provider: return matches for prefix
+_my_provider() {
+    local _prefix="$1" _out="$2"
+    local _items=("users" "user_roles" "products")
+    local _matches=()
+    for _i in "${_items[@]}"; do
+        case "$_i" in "${_prefix}"*) _matches+=("$_i") ;; esac
+    done
+    eval "$_out=(\"\${_matches[@]+\"\${_matches[@]}\"}\")"
+}
+
+# Attach to an input field
+shellframe_field_init "myfield"
+SHELLFRAME_AC_PROVIDER="_my_provider"
+SHELLFRAME_AC_TRIGGER="tab"
+shellframe_ac_attach "myfield" "field"
+
+# In your on_key handler:
+shellframe_ac_on_key "$key" && return 0
+# ... field processes key ...
+shellframe_ac_on_key_after   # re-filter in auto mode
+```
