@@ -168,8 +168,7 @@ _shellframe_dv_render_pane() {
         _undim="${_reset}"
     fi
 
-    # Build all output into a buffer (no subshells), then write once
-    local _buf="" _tmp=""
+    local _tmp=""
 
     local _fh_on="${SHELLFRAME_DIFF_VIEW_FILE_HDR_ON:-${_bold}${_reverse}}"
     local _fh_off="${SHELLFRAME_DIFF_VIEW_FILE_HDR_OFF:-${_reset}}"
@@ -236,30 +235,27 @@ _shellframe_dv_render_pane() {
         local _shdr_pad=$(( _shdr_inner - ${#_sfname_clip} - ${#_sstatus} ))
         (( _shdr_pad < 0 )) && _shdr_pad=0
 
-        printf -v _tmp '\033[%d;%dH%*s\033[%d;%dH' \
-            "$_top" "$_left" "$_width" "" "$_top" "$_left"
-        _buf+="$_tmp"
+        shellframe_fb_fill "$_top" "$_left" "$_width"
         printf -v _tmp '%s▎%s%s%s%s%*s%s' \
             "$_fh_on" "$_bold" "$_sfname_clip" "$_reset$_fh_on" \
             "${_scolor}${_sstatus}${_reset}${_fh_on}" \
             "$_shdr_pad" "" "$_fh_off"
-        _buf+="$_tmp"
+        shellframe_fb_print_ansi "$_top" "$_left" "$_tmp"
     fi
 
-    local _r
+    local _r _row_buf
     for (( _r=_content_start; _r < _height; _r++ )); do
         local _row_idx=$(( _scroll_top + (_r - _content_start) ))
         local _screen_row=$(( _top + _r ))
 
-        # Position cursor and clear the line area (printf -v, no fork)
-        printf -v _tmp '\033[%d;%dH%*s\033[%d;%dH' \
-            "$_screen_row" "$_left" "$_width" "" "$_screen_row" "$_left"
-        _buf+="${_tmp}${_dim}"
+        # Clear the row region in the framebuffer
+        shellframe_fb_fill "$_screen_row" "$_left" "$_width"
 
         if (( _row_idx >= SHELLFRAME_DIFF_ROW_COUNT )); then
-            _buf+="$_undim"
             continue
         fi
+
+        _row_buf="${_dim}"
 
         local _type="${SHELLFRAME_DIFF_TYPES[$_row_idx]}"
         local _text _lnum
@@ -275,7 +271,6 @@ _shellframe_dv_render_pane() {
         case "$_type" in
             hdr)
                 if (( SHELLFRAME_DIFF_VIEW_HIDE_FILE_HDR )); then
-                    _buf+="$_undim"
                     continue
                 fi
                 # Look up file status for this header row
@@ -308,21 +303,18 @@ _shellframe_dv_render_pane() {
                 local _fname_clip="${_text:0:$_fname_max}"
                 local _hdr_pad=$(( _hdr_inner - ${#_fname_clip} - ${#_status_label} ))
                 (( _hdr_pad < 0 )) && _hdr_pad=0
-                printf -v _tmp '%s▎%s%s%s%s%*s%s' \
-                    "$_fh_on" "$_bold" "$_fname_clip" "$_reset$_fh_on" \
+                printf -v _tmp '%s%s▎%s%s%s%s%*s%s%s' \
+                    "$_dim" "$_fh_on" "$_bold" "$_fname_clip" "$_reset$_fh_on" \
                     "${_status_color}${_status_label}${_reset}${_fh_on}" \
-                    "$_hdr_pad" "" "$_fh_off"
-                _buf+="${_tmp}${_undim}"
+                    "$_hdr_pad" "" "$_fh_off" "$_undim"
+                shellframe_fb_print_ansi "$_screen_row" "$_left" "$_tmp"
                 continue
                 ;;
             file_sep)
                 if (( SHELLFRAME_DIFF_VIEW_HIDE_FILE_HDR )); then
-                    _buf+="$_undim"
                     continue
                 fi
-                local _rule="" _rc
-                for (( _rc=0; _rc < _width; _rc++ )); do _rule+="─"; done
-                _buf+="${_gray}${_rule}${_reset}${_undim}"
+                shellframe_fb_fill "$_screen_row" "$_left" "$_width" "─" "${_dim}${_gray}"
                 continue
                 ;;
             sep)
@@ -332,8 +324,8 @@ _shellframe_dv_render_pane() {
                 local _sep_label=" ···"
                 local _sep_pad=$(( _width - ${#_sep_label} ))
                 (( _sep_pad < 0 )) && _sep_pad=0
-                printf -v _tmp '%s%s%s%*s%s' "$_sep_bg" "$_sep_txt" "$_sep_label" "$_sep_pad" "" "$_reset"
-                _buf+="${_tmp}${_undim}"
+                printf -v _tmp '%s%s%s%s%*s%s%s' "$_dim" "$_sep_bg" "$_sep_txt" "$_sep_label" "$_sep_pad" "" "$_reset" "$_undim"
+                shellframe_fb_print_ansi "$_screen_row" "$_left" "$_tmp"
                 continue
                 ;;
         esac
@@ -357,14 +349,14 @@ _shellframe_dv_render_pane() {
         if (( _is_blank_opposite )); then
             # Entire gutter dark on blank side
             printf -v _tmp '%s         %s' "$_ln_bg" "$_reset"
-            _buf+="$_tmp"
+            _row_buf+="$_tmp"
         else
             if [[ -n "$_lnum" ]]; then
                 printf -v _tmp '%s %s%4s %s' "$_ln_bg" "$_ln_fg" "$_lnum" "$_reset"
             else
                 printf -v _tmp '%s      %s' "$_ln_bg" "$_reset"
             fi
-            _buf+="$_tmp"
+            _row_buf+="$_tmp"
 
             # Change indicator zone: background matches the content change color
             local _ind_bg="" _ind_fg=""
@@ -374,9 +366,9 @@ _shellframe_dv_render_pane() {
                 *)   _ind_bg=""; _ind_fg="" ;;
             esac
             if [[ -n "$_ind_bg" ]]; then
-                _buf+="${_ind_bg} ${_ind_fg}${_indicator}${_ind_bg} ${_reset}"
+                _row_buf+="${_ind_bg} ${_ind_fg}${_indicator}${_ind_bg} ${_reset}"
             else
-                _buf+="   "
+                _row_buf+="   "
             fi
         fi
 
@@ -398,48 +390,45 @@ _shellframe_dv_render_pane() {
                     fi
                 fi
                 if [[ -n "$_hl_text" ]]; then
-                    # Always clip highlighted text — bat output may differ
-                    # in visible width from our tab-expanded measurement
                     local _hl_clipped
                     _shellframe_dv_clip_ansi "$_hl_text" "$_content_w" _hl_clipped
-                    _buf+="${_hl_clipped}${_reset}"
+                    _row_buf+="${_hl_clipped}${_reset}"
                 else
-                    _buf+=$'\033[38;5;245m'"${_display}${_reset}"
+                    _row_buf+=$'\033[38;5;245m'"${_display}${_reset}"
                 fi
                 ;;
             add)
                 if [[ "$_side" == "right" ]]; then
                     printf -v _tmp '%s%s%*s%s' "$_add_on" "$_display" "$_fill_n" "" "$_reset"
-                    _buf+="$_tmp"
+                    _row_buf+="$_tmp"
                 else
                     printf -v _tmp '%s%*s%s' "$_ln_bg" "$_content_w" "" "$_reset"
-                    _buf+="$_tmp"
+                    _row_buf+="$_tmp"
                 fi
                 ;;
             del)
                 if [[ "$_side" == "left" ]]; then
                     printf -v _tmp '%s%s%*s%s' "$_del_on" "$_display" "$_fill_n" "" "$_reset"
-                    _buf+="$_tmp"
+                    _row_buf+="$_tmp"
                 else
                     printf -v _tmp '%s%*s%s' "$_ln_bg" "$_content_w" "" "$_reset"
-                    _buf+="$_tmp"
+                    _row_buf+="$_tmp"
                 fi
                 ;;
             chg)
                 if [[ "$_side" == "left" ]]; then
                     printf -v _tmp '%s%s%*s%s' "$_del_on" "$_display" "$_fill_n" "" "$_reset"
-                    _buf+="$_tmp"
+                    _row_buf+="$_tmp"
                 else
                     printf -v _tmp '%s%s%*s%s' "$_add_on" "$_display" "$_fill_n" "" "$_reset"
-                    _buf+="$_tmp"
+                    _row_buf+="$_tmp"
                 fi
                 ;;
         esac
-        _buf+="$_undim"
-    done
+        _row_buf+="$_undim"
 
-    # Single write for the entire pane
-    printf '%s' "$_buf" >&3
+        shellframe_fb_print_ansi "$_screen_row" "$_left" "$_row_buf"
+    done
 }
 
 # ── shellframe_diff_view_render ─────────────────────────────────────────────
@@ -478,7 +467,7 @@ shellframe_diff_view_render() {
         local _gray="${SHELLFRAME_GRAY:-}"
         local _reset="${SHELLFRAME_RESET:-}"
         local _rev="${SHELLFRAME_REVERSE:-}"
-        local _fbuf="" _ftmp=""
+        local _ftmp=""
 
         # Get full-width pane bounds (not the content-height-reduced ones)
         local _flt _fll _flw _flh _frt _frl _frw _frh
@@ -493,27 +482,21 @@ shellframe_diff_view_render() {
         local _lf="${SHELLFRAME_DIFF_VIEW_LEFT_FOOTER:-}"
         local _ld="${SHELLFRAME_DIFF_VIEW_LEFT_DATE:-}"
         local _lf_clip="${_lf:0:$(( _flw - ${#_ld} - 3 ))}"
-        printf -v _ftmp '\033[%d;%dH%s%s %s' \
-            "$_footer_row" "$_fll" "$_rev" "$_white" "$_lf_clip"
-        _fbuf+="$_ftmp"
         local _lmid=$(( _flw - ${#_lf_clip} - ${#_ld} - 2 ))
         (( _lmid < 0 )) && _lmid=0
-        printf -v _ftmp '%*s%s %s' "$_lmid" "" "$_ld" "$_reset"
-        _fbuf+="$_ftmp"
+        printf -v _ftmp '%s%s %s%*s%s %s' \
+            "$_rev" "$_white" "$_lf_clip" "$_lmid" "" "$_ld" "$_reset"
+        shellframe_fb_print_ansi "$_footer_row" "$_fll" "$_ftmp"
 
         # Right footer
         local _rf="${SHELLFRAME_DIFF_VIEW_RIGHT_FOOTER:-}"
         local _rd="${SHELLFRAME_DIFF_VIEW_RIGHT_DATE:-}"
         local _rf_clip="${_rf:0:$(( _frw - ${#_rd} - 3 ))}"
-        printf -v _ftmp '\033[%d;%dH%s%s %s' \
-            "$_footer_row" "$_frl" "$_rev" "$_white" "$_rf_clip"
-        _fbuf+="$_ftmp"
         local _rmid=$(( _frw - ${#_rf_clip} - ${#_rd} - 2 ))
         (( _rmid < 0 )) && _rmid=0
-        printf -v _ftmp '%*s%s %s' "$_rmid" "" "$_rd" "$_reset"
-        _fbuf+="$_ftmp"
-
-        printf '%s' "$_fbuf" >&3
+        printf -v _ftmp '%s%s %s%*s%s %s' \
+            "$_rev" "$_white" "$_rf_clip" "$_rmid" "" "$_rd" "$_reset"
+        shellframe_fb_print_ansi "$_footer_row" "$_frl" "$_ftmp"
     fi
 }
 
@@ -556,18 +539,14 @@ shellframe_diff_view_render_side() {
         local _reset="${SHELLFRAME_RESET:-}"
         local _white="${SHELLFRAME_WHITE:-}"
         local _rev="${SHELLFRAME_REVERSE:-}"
-        local _fbuf="" _ftmp=""
+        local _ftmp=""
 
         local _ftext="${_footer_key:0:$(( _width - ${#_date_key} - 3 ))}"
-        printf -v _ftmp '\033[%d;%dH%s%s %s' \
-            "$_footer_row" "$_left" "$_rev" "$_white" "$_ftext"
-        _fbuf+="$_ftmp"
         local _mid=$(( _width - ${#_ftext} - ${#_date_key} - 2 ))
         (( _mid < 0 )) && _mid=0
-        printf -v _ftmp '%*s%s %s' "$_mid" "" "$_date_key" "$_reset"
-        _fbuf+="$_ftmp"
-
-        printf '%s' "$_fbuf" >&3
+        printf -v _ftmp '%s%s %s%*s%s %s' \
+            "$_rev" "$_white" "$_ftext" "$_mid" "" "$_date_key" "$_reset"
+        shellframe_fb_print_ansi "$_footer_row" "$_left" "$_ftmp"
     fi
 }
 

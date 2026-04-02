@@ -48,14 +48,17 @@ _setup_render_diff() {
     SHELLFRAME_DIFF_VIEW_RIGHT_DATE=""
 }
 
-# Helper: call a render fn with fd 3 → temp file; return ANSI-stripped output.
+# Helper: call a render fn via framebuffer → temp file; return ANSI-stripped output.
 # Usage: _c=$(_dv_capture fn arg...)
 _dv_capture() {
     local _fn="$1"; shift
     local _f
     _f=$(mktemp "${TMPDIR:-/tmp}/sf-test-dv.XXXXXX")
+    _SF_ROW_PREV=()
+    shellframe_fb_frame_start 24 80
     exec 3>"$_f"
     "$_fn" "$@"
+    shellframe_screen_flush
     exec 3>&- 2>/dev/null || true
     sed 's/\033\[[0-9;]*[A-Za-z]//g' "$_f"
     rm -f "$_f"
