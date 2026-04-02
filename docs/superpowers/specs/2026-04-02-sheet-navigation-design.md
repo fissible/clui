@@ -34,6 +34,11 @@ _SHELLFRAME_SHEET_NEXT=""           # next screen name; "__POP__" to dismiss
 _SHELLFRAME_SHEET_FROZEN_ROWS=()    # full-screen framebuffer snapshot taken at push time
 SHELLFRAME_SHEET_HEIGHT=0           # consumer sets in render hook; 0 = fill to bottom
 SHELLFRAME_SHEET_WIDTH=0            # set by sheet draw code before calling render hook; read-only for consumers
+# Sheet-local focus/region registry (parallel to shell globals; swapped in/out each frame)
+_SHELLFRAME_SHEET_REGIONS=()        # parallel to _SHELLFRAME_SHELL_REGIONS
+_SHELLFRAME_SHEET_FOCUS_RING=()     # parallel to _SHELLFRAME_SHELL_FOCUS_RING
+_SHELLFRAME_SHEET_FOCUS_IDX=0       # parallel to _SHELLFRAME_SHELL_FOCUS_IDX
+_SHELLFRAME_SHEET_FOCUS_REQUEST=""  # parallel to _SHELLFRAME_SHELL_FOCUS_REQUEST
 ```
 
 ---
@@ -41,7 +46,9 @@ SHELLFRAME_SHEET_WIDTH=0            # set by sheet draw code before calling rend
 ## Public API
 
 ```bash
-# Push a sheet (call from a shellframe_shell event handler)
+# Push a sheet (call from a shellframe_shell event handler).
+# If a sheet is already active (_SHELLFRAME_SHEET_ACTIVE=1), returns 1 immediately
+# and prints a warning to stderr. Stacking is not supported in v1.
 shellframe_sheet_push prefix screen
 #   prefix  — hook prefix, e.g. "_myapp"
 #   screen  — initial screen name, e.g. "OPEN_DB"
@@ -53,6 +60,9 @@ shellframe_sheet_pop
 shellframe_sheet_active
 ```
 
+**First consumer:** shellql#12 — the "Open Database" connection form triggered from the
+welcome screen. This is the primary use case that drove the design.
+
 ---
 
 ## Hook convention
@@ -63,7 +73,8 @@ Consumers already know this pattern.
 **Region coordinates are sheet-relative.** Row 1 = first row of sheet content (screen
 row 2, immediately below the back strip). The sheet draw code offsets all region rows
 by `_sheet_top - 1` before dispatching renders and key events. Consumers never need to
-know the back strip height.
+know the back strip height. Use `$SHELLFRAME_SHEET_WIDTH` (set before calling the render
+hook) for the width argument.
 
 ```bash
 # Layout hook — called once per draw cycle
@@ -109,18 +120,35 @@ done
 
 ### Each draw frame
 
-1. `shellframe_fb_frame_start rows cols` — full screen (not just sheet rows)
-2. Reset `SHELLFRAME_SHEET_HEIGHT=0`
-3. Call `${_SHELLFRAME_SHEET_PREFIX}_${_SHELLFRAME_SHEET_SCREEN}_render` — consumer may set `SHELLFRAME_SHEET_HEIGHT` and registers regions
-4. Resolve sheet bounds:
+1. **Registry swap (in):** Save parent shell's `_SHELLFRAME_SHELL_REGIONS`, `_SHELLFRAME_SHELL_FOCUS_RING`, `_SHELLFRAME_SHELL_FOCUS_IDX`, `_SHELLFRAME_SHELL_FOCUS_REQUEST` to locals. Load sheet's own copies (`_SHELLFRAME_SHEET_REGIONS` etc.) into the shell globals so `shellframe_shell_region`, `_shellframe_shell_focus_init`, and `_shellframe_shell_focused_region` work unchanged.
+2. `shellframe_fb_frame_start rows cols` — full screen (not just sheet rows)
+3. Set `SHELLFRAME_SHEET_WIDTH="$cols"`, reset `SHELLFRAME_SHEET_HEIGHT=0`
+4. Call `${_SHELLFRAME_SHEET_PREFIX}_${_SHELLFRAME_SHEET_SCREEN}_render` — consumer may set `SHELLFRAME_SHEET_HEIGHT` and registers regions via `shellframe_shell_region`
+5. Resolve sheet bounds:
    - `_sheet_top=2`
    - `_sheet_h = SHELLFRAME_SHEET_HEIGHT > 0 ? SHELLFRAME_SHEET_HEIGHT : (rows - 1)`
    - `_sheet_bottom = 1 + _sheet_h`
-5. Write frozen rows into framebuffer:
+6. Write frozen rows into framebuffer (see dimming note below):
    - Row 1 (back strip): `_SHELLFRAME_SHEET_FROZEN_ROWS[1]` wrapped in `\033[2m…\033[22m`
    - Rows `_sheet_bottom+1` to `rows`: corresponding frozen rows, also dimmed
-6. Render sheet regions (rows 2 to `_sheet_bottom`) via the normal `shellframe_shell_region` dispatch
-7. `shellframe_screen_flush` — diffs full screen including frozen rows; handles sheet shrink automatically
+7. Render sheet regions (rows 2 to `_sheet_bottom`) with all region row coordinates offset by `_sheet_top - 1`
+8. **Registry swap (out):** Copy updated shell globals back into `_SHELLFRAME_SHEET_REGIONS`, `_SHELLFRAME_SHEET_FOCUS_RING`, `_SHELLFRAME_SHEET_FOCUS_IDX`. Restore parent shell's original registry from locals.
+9. `shellframe_screen_flush` — diffs full screen including frozen rows; handles sheet shrink automatically
+
+### Region registry isolation
+
+The swap approach (steps 1 and 8) ensures:
+- Sheet `shellframe_shell_region` calls never contaminate the parent shell's registry
+- All existing shell helper functions work unchanged inside the sheet draw cycle — no new functions needed
+- Sheet focus state (`_SHELLFRAME_SHEET_FOCUS_*`) persists across frames and is only active during the sheet draw cycle
+
+### Dimming the back strip (best-effort for v1)
+
+Frozen rows are stored with their original ANSI sequences. Wrapping with `\033[2m…\033[22m`
+dims content that has no mid-string resets, but rows containing `\033[0m` (full reset) will
+have their dim cancelled at that point. This is **best-effort** for v1 — partial dimming is
+visually acceptable and avoids the complexity of stripping and re-rendering frozen ANSI rows.
+Document this as a known limitation in the example.
 
 ### Why frozen rows go into the framebuffer (not direct to terminal)
 
@@ -167,7 +195,7 @@ Three paths to pop the sheet:
 | Trigger | Mechanism |
 |---------|-----------|
 | `Esc` | `shellframe_sheet_on_key` intercepts `$'\033'` before region dispatch, calls quit hook |
-| Up from topmost region | Sheet key handler dispatches Up to the focused region first; if the region returns 1 (unhandled) AND focus is at ring index 0, sheet calls quit hook |
+| Up from topmost region | Sheet key handler dispatches Up to the focused region's `on_key` first; if it returns 1 (unhandled) AND `_SHELLFRAME_SHELL_FOCUS_IDX == 0` (first item in the sheet's focus ring, loaded via swap), sheet calls quit hook |
 | Explicit `shellframe_sheet_pop` | Consumer calls from any action handler |
 
 `shellframe_sheet_pop` sets `_SHELLFRAME_SHEET_NEXT="__POP__"`. On the next draw cycle
@@ -221,9 +249,11 @@ No other changes to shell.sh.
 - `shellframe_sheet_push` sets `_SHELLFRAME_SHEET_ACTIVE=1`, captures frozen rows, sets prefix/screen
 - `shellframe_sheet_pop` clears all state, sets `_SHELLFRAME_SHEET_ACTIVE=0`
 - `shellframe_sheet_active` returns correct exit code
+- Double-push while `_SHELLFRAME_SHEET_ACTIVE=1` returns 1 (no-op) and emits warning to stderr; existing sheet state unchanged
 - Height 0 resolves to `rows - 1`; explicit value is respected
 - `_SHELLFRAME_SHEET_NEXT="STEP2"` updates screen, resets focus
 - `_SHELLFRAME_SHEET_NEXT="__POP__"` triggers pop
+- Registry swap: parent shell registry restored exactly after sheet draw
 - Frozen rows written into framebuffer at row 1 and below sheet boundary
 - Sheet shrink: rows newly below sheet boundary get frozen content, not stale sheet content
 
