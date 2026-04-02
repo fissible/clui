@@ -76,14 +76,16 @@ shellframe_scrollbar_render() {
         (( _thumb_top > _track_space )) && _thumb_top="$_track_space"
     fi
 
-    # Render track + thumb
+    # Render track + thumb.
+    # \033[22m\033[39m resets dim/bold and FG after each char so styles don't
+    # bleed into content rendered to the right on the same terminal row.
     local _r
     for (( _r=0; _r<_height; _r++ )); do
         local _row=$(( _top + _r ))
         if (( _r >= _thumb_top && _r < _thumb_top + _thumb_h )); then
-            shellframe_fb_put "$_row" "$_col" "${_tstyle}${_thumb}"
+            shellframe_fb_put "$_row" "$_col" "${_tstyle}${_thumb}"$'\033[22m\033[39m'
         else
-            shellframe_fb_put "$_row" "$_col" "${_style}${_track}"
+            shellframe_fb_put "$_row" "$_col" "${_style}${_track}"$'\033[22m\033[39m'
         fi
     done
     return 0

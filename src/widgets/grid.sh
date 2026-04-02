@@ -390,16 +390,18 @@ shellframe_grid_render() {
             fi
 
             # Separator after this column — always gray, regardless of cursor.
+            # \033[39m resets FG to default after the gray char so it doesn't
+            # bleed into the next column's cell text (which uses _row_bg only).
             if (( _vi < _n_vis_seps )); then
                 local _sxoff="${_vis_sep_x[$_vi]}"
                 local _schar="${_vis_sep_char[$_vi]}"
-                shellframe_fb_put "$_row" "$(( _left + _sxoff ))" "${_row_bg}${_gray}${_schar}"
+                shellframe_fb_put "$_row" "$(( _left + _sxoff ))" "${_row_bg}${_gray}${_schar}"$'\033[39m'
             fi
         done
 
         # Right end-of-data border in data row (only for rows that have data)
         if (( _right_border_x >= 0 && _ridx < _nrows )); then
-            shellframe_fb_put "$_row" "$(( _left + _right_border_x ))" "${_row_bg}${_gray}│"
+            shellframe_fb_put "$_row" "$(( _left + _right_border_x ))" "${_row_bg}${_gray}│"$'\033[39m'
         fi
     done
 }

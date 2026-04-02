@@ -200,12 +200,14 @@ shellframe_panel_render() {
         _shellframe_panel_hline "$_top" "$_left" "$_width" "$_tl" "$_hr" "$_tr" "$_title" "$_talign" "$_on"
     fi
 
-    # Side borders
+    # Side borders.
+    # \033[39m resets FG after each border character so the accent/bold color
+    # from _on does not bleed into cell content on the same terminal row.
     local _r
     for (( _r=1; _r<_height-1; _r++ )); do
         local _row=$(( _top + _r ))
-        shellframe_fb_put "$_row" "$_left"                    "${_on}${_vr}"
-        shellframe_fb_put "$_row" "$(( _left + _width - 1 ))" "${_on}${_vr}"
+        shellframe_fb_put "$_row" "$_left"                    "${_on}${_vr}"$'\033[m'
+        shellframe_fb_put "$_row" "$(( _left + _width - 1 ))" "${_on}${_vr}"$'\033[m'
     done
 
     # Bottom border
