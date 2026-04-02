@@ -227,3 +227,126 @@ shellframe_sheet_draw() {
     # ── Flush ─────────────────────────────────────────────────────────────────
     shellframe_screen_flush
 }
+
+# ── shellframe_sheet_on_key ───────────────────────────────────────────────────
+#
+# Key dispatch for the active sheet. Called by shell.sh key loop delegation.
+# Mirrors shell.sh key handling: Tab/Shift-Tab cycle focus, rc=2 dispatches
+# action, Esc calls quit hook (or pops), Up unhandled at topmost calls quit.
+# Registry swap ensures shell globals work correctly and parent state is restored.
+
+shellframe_sheet_on_key() {
+    local _key="$1"
+    local _prefix="$_SHELLFRAME_SHEET_PREFIX"
+    local _screen="$_SHELLFRAME_SHEET_SCREEN"
+
+    local _k_esc=$'\033'
+    local _k_up=$'\033[A'
+    local _k_tab=$'\t'
+    local _k_shift_tab="${SHELLFRAME_KEY_SHIFT_TAB:-$'\033[Z'}"
+
+    # ── Registry swap in ──────────────────────────────────────────────────────
+    local _saved_regions=()
+    local _saved_ring=()
+    local _saved_idx="$_SHELLFRAME_SHELL_FOCUS_IDX"
+    local _saved_req="$_SHELLFRAME_SHELL_FOCUS_REQUEST"
+    _saved_regions=("${_SHELLFRAME_SHELL_REGIONS[@]+"${_SHELLFRAME_SHELL_REGIONS[@]}"}")
+    _saved_ring=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
+    _SHELLFRAME_SHELL_REGIONS=("${_SHELLFRAME_SHEET_REGIONS[@]+"${_SHELLFRAME_SHEET_REGIONS[@]}"}")
+    _SHELLFRAME_SHELL_FOCUS_RING=("${_SHELLFRAME_SHEET_FOCUS_RING[@]+"${_SHELLFRAME_SHEET_FOCUS_RING[@]}"}")
+    _SHELLFRAME_SHELL_FOCUS_IDX="$_SHELLFRAME_SHEET_FOCUS_IDX"
+    _SHELLFRAME_SHELL_FOCUS_REQUEST="$_SHELLFRAME_SHEET_FOCUS_REQUEST"
+
+    # ── Esc: dismiss sheet ────────────────────────────────────────────────────
+    if [[ "$_key" == "$_k_esc" ]]; then
+        if declare -f "${_prefix}_${_screen}_quit" >/dev/null 2>&1; then
+            "${_prefix}_${_screen}_quit"
+        else
+            shellframe_sheet_pop
+        fi
+        shellframe_shell_mark_dirty
+        # swap out and return
+        _SHELLFRAME_SHEET_REGIONS=("${_SHELLFRAME_SHELL_REGIONS[@]+"${_SHELLFRAME_SHELL_REGIONS[@]}"}")
+        _SHELLFRAME_SHEET_FOCUS_RING=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
+        _SHELLFRAME_SHEET_FOCUS_IDX="$_SHELLFRAME_SHELL_FOCUS_IDX"
+        _SHELLFRAME_SHELL_REGIONS=("${_saved_regions[@]+"${_saved_regions[@]}"}")
+        _SHELLFRAME_SHELL_FOCUS_RING=("${_saved_ring[@]+"${_saved_ring[@]}"}")
+        _SHELLFRAME_SHELL_FOCUS_IDX="$_saved_idx"
+        _SHELLFRAME_SHELL_FOCUS_REQUEST="$_saved_req"
+        return 0
+    fi
+
+    # ── Tab: cycle focus forward ──────────────────────────────────────────────
+    if [[ "$_key" == "$_k_tab" ]]; then
+        local _focused
+        _shellframe_shell_focus_owner _focused
+        [[ -n "$_focused" ]] && \
+            declare -f "${_prefix}_${_screen}_${_focused}_on_focus" >/dev/null 2>&1 && \
+            "${_prefix}_${_screen}_${_focused}_on_focus" 0 || true
+        _shellframe_shell_focus_next
+        shellframe_shell_mark_dirty
+        _SHELLFRAME_SHEET_FOCUS_RING=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
+        _SHELLFRAME_SHEET_FOCUS_IDX="$_SHELLFRAME_SHELL_FOCUS_IDX"
+        _SHELLFRAME_SHELL_REGIONS=("${_saved_regions[@]+"${_saved_regions[@]}"}")
+        _SHELLFRAME_SHELL_FOCUS_RING=("${_saved_ring[@]+"${_saved_ring[@]}"}")
+        _SHELLFRAME_SHELL_FOCUS_IDX="$_saved_idx"
+        _SHELLFRAME_SHELL_FOCUS_REQUEST="$_saved_req"
+        return 0
+    fi
+
+    # ── Shift-Tab: cycle focus backward ──────────────────────────────────────
+    if [[ "$_key" == "$_k_shift_tab" ]]; then
+        local _focused
+        _shellframe_shell_focus_owner _focused
+        [[ -n "$_focused" ]] && \
+            declare -f "${_prefix}_${_screen}_${_focused}_on_focus" >/dev/null 2>&1 && \
+            "${_prefix}_${_screen}_${_focused}_on_focus" 0 || true
+        _shellframe_shell_focus_prev
+        shellframe_shell_mark_dirty
+        _SHELLFRAME_SHEET_FOCUS_RING=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
+        _SHELLFRAME_SHEET_FOCUS_IDX="$_SHELLFRAME_SHELL_FOCUS_IDX"
+        _SHELLFRAME_SHELL_REGIONS=("${_saved_regions[@]+"${_saved_regions[@]}"}")
+        _SHELLFRAME_SHELL_FOCUS_RING=("${_saved_ring[@]+"${_saved_ring[@]}"}")
+        _SHELLFRAME_SHELL_FOCUS_IDX="$_saved_idx"
+        _SHELLFRAME_SHELL_FOCUS_REQUEST="$_saved_req"
+        return 0
+    fi
+
+    # ── Deliver key to focused region ─────────────────────────────────────────
+    local _focused
+    _shellframe_shell_focus_owner _focused
+    if [[ -n "$_focused" ]] && \
+       declare -f "${_prefix}_${_screen}_${_focused}_on_key" >/dev/null 2>&1; then
+        local _rc=0
+        "${_prefix}_${_screen}_${_focused}_on_key" "$_key" || _rc=$?
+
+        if (( _rc == 0 )); then
+            shellframe_shell_mark_dirty
+        elif (( _rc == 1 )); then
+            # Unhandled — check for Up-from-topmost dismiss
+            if [[ "$_key" == "$_k_up" ]] && (( _SHELLFRAME_SHELL_FOCUS_IDX == 0 )); then
+                if declare -f "${_prefix}_${_screen}_quit" >/dev/null 2>&1; then
+                    "${_prefix}_${_screen}_quit"
+                else
+                    shellframe_sheet_pop
+                fi
+                shellframe_shell_mark_dirty
+            fi
+        elif (( _rc == 2 )); then
+            _SHELLFRAME_SHEET_NEXT=""
+            declare -f "${_prefix}_${_screen}_${_focused}_action" >/dev/null 2>&1 && \
+                "${_prefix}_${_screen}_${_focused}_action" || true
+            shellframe_shell_mark_dirty
+        fi
+    fi
+
+    # ── Registry swap out ─────────────────────────────────────────────────────
+    _SHELLFRAME_SHEET_REGIONS=("${_SHELLFRAME_SHELL_REGIONS[@]+"${_SHELLFRAME_SHELL_REGIONS[@]}"}")
+    _SHELLFRAME_SHEET_FOCUS_RING=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
+    _SHELLFRAME_SHEET_FOCUS_IDX="$_SHELLFRAME_SHELL_FOCUS_IDX"
+    _SHELLFRAME_SHEET_FOCUS_REQUEST="$_SHELLFRAME_SHELL_FOCUS_REQUEST"
+    _SHELLFRAME_SHELL_REGIONS=("${_saved_regions[@]+"${_saved_regions[@]}"}")
+    _SHELLFRAME_SHELL_FOCUS_RING=("${_saved_ring[@]+"${_saved_ring[@]}"}")
+    _SHELLFRAME_SHELL_FOCUS_IDX="$_saved_idx"
+    _SHELLFRAME_SHELL_FOCUS_REQUEST="$_saved_req"
+}
