@@ -61,6 +61,8 @@ shellframe_sheet_push() {
     _SHELLFRAME_SHEET_FROZEN_ROWS=()
     local _r
     for (( _r=1; _r<=_rows; _r++ )); do
+        # Use :- default (not guard form) — _SF_ROW_CURR exists as an array;
+        # bash 3.2 only treats the array itself as unbound, not missing keys.
         _SHELLFRAME_SHEET_FROZEN_ROWS[$_r]="${_SF_ROW_CURR[$_r]:-}"
     done
 
