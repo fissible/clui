@@ -26,9 +26,9 @@ assert_contains "$out" "Welcome" "parent content visible in back strip"
 # ── Form input ────────────────────────────────────────────────────────────────
 
 ptyunit_test_begin "sheet: typing in Name field is accepted"
-# Type 'alice' in Name field, then Enter submits the form and transitions to Step 2
-out=$(_pty ENTER a l i c e ENTER ESC q)
-assert_contains "$out" "Step 1 of 2" "step 1 visible (typing accepted)"
+# Type 'alice' in Name field, Tab to next field/button, Tab to Next button, Enter
+out=$(_pty ENTER a l i c e TAB TAB ENTER ESC q)
+assert_contains "$out" "Step 2 of 2" "transitions to step 2 after name input"
 
 # ── Wizard transition ─────────────────────────────────────────────────────────
 

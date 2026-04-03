@@ -171,6 +171,10 @@ _wz_STEP2_submit_action() {
     local _city="${_step2_vals[0]:-}"
 
     _WZ_RESULT="Submitted:${_name}:${_city}"
+    # NOTE: __QUIT__ is processed by shell.sh before __POP__ can run through
+    # shellframe_sheet_draw, so _SHELLFRAME_SHEET_ACTIVE stays 1 on exit.
+    # This is safe for single-run scripts; don't call shellframe_shell again
+    # in the same process after this pattern.
     _SHELLFRAME_SHEET_NEXT="__POP__"
     _SHELLFRAME_SHELL_NEXT="__QUIT__"
 }
