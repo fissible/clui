@@ -590,6 +590,11 @@ shellframe_shell() {
                 continue
             fi
 
+            # ── Ctrl+Q: unconditional quit from any screen/focus ──────────
+            if [[ "$_key" == $'\x11' ]]; then
+                _current="__QUIT__"; _screen_done=1; continue
+            fi
+
             # ── Deliver key to focused region ──────────────────────────────
             if [[ -n "$_focused" ]] && \
                declare -f "${_prefix}_${_current}_${_focused}_on_key" >/dev/null 2>&1; then
