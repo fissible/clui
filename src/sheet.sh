@@ -234,6 +234,10 @@ shellframe_sheet_draw() {
 # Mirrors shell.sh key handling: Tab/Shift-Tab cycle focus, rc=2 dispatches
 # action, Esc calls quit hook (or pops), Up unhandled at topmost calls quit.
 # Registry swap ensures shell globals work correctly and parent state is restored.
+#
+# NOTE: Tab and Shift-Tab are reserved at the sheet level — they always cycle
+# focus and are never offered to region on_key handlers. Region widgets that
+# use Tab internally (e.g. multi-column grids) are not supported inside sheets.
 
 shellframe_sheet_on_key() {
     local _key="$1"
@@ -269,6 +273,7 @@ shellframe_sheet_on_key() {
         _SHELLFRAME_SHEET_REGIONS=("${_SHELLFRAME_SHELL_REGIONS[@]+"${_SHELLFRAME_SHELL_REGIONS[@]}"}")
         _SHELLFRAME_SHEET_FOCUS_RING=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
         _SHELLFRAME_SHEET_FOCUS_IDX="$_SHELLFRAME_SHELL_FOCUS_IDX"
+        _SHELLFRAME_SHEET_FOCUS_REQUEST="$_SHELLFRAME_SHELL_FOCUS_REQUEST"
         _SHELLFRAME_SHELL_REGIONS=("${_saved_regions[@]+"${_saved_regions[@]}"}")
         _SHELLFRAME_SHELL_FOCUS_RING=("${_saved_ring[@]+"${_saved_ring[@]}"}")
         _SHELLFRAME_SHELL_FOCUS_IDX="$_saved_idx"
@@ -287,6 +292,7 @@ shellframe_sheet_on_key() {
         shellframe_shell_mark_dirty
         _SHELLFRAME_SHEET_FOCUS_RING=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
         _SHELLFRAME_SHEET_FOCUS_IDX="$_SHELLFRAME_SHELL_FOCUS_IDX"
+        _SHELLFRAME_SHEET_FOCUS_REQUEST="$_SHELLFRAME_SHELL_FOCUS_REQUEST"
         _SHELLFRAME_SHELL_REGIONS=("${_saved_regions[@]+"${_saved_regions[@]}"}")
         _SHELLFRAME_SHELL_FOCUS_RING=("${_saved_ring[@]+"${_saved_ring[@]}"}")
         _SHELLFRAME_SHELL_FOCUS_IDX="$_saved_idx"
@@ -305,6 +311,7 @@ shellframe_sheet_on_key() {
         shellframe_shell_mark_dirty
         _SHELLFRAME_SHEET_FOCUS_RING=("${_SHELLFRAME_SHELL_FOCUS_RING[@]+"${_SHELLFRAME_SHELL_FOCUS_RING[@]}"}")
         _SHELLFRAME_SHEET_FOCUS_IDX="$_SHELLFRAME_SHELL_FOCUS_IDX"
+        _SHELLFRAME_SHEET_FOCUS_REQUEST="$_SHELLFRAME_SHELL_FOCUS_REQUEST"
         _SHELLFRAME_SHELL_REGIONS=("${_saved_regions[@]+"${_saved_regions[@]}"}")
         _SHELLFRAME_SHELL_FOCUS_RING=("${_saved_ring[@]+"${_saved_ring[@]}"}")
         _SHELLFRAME_SHELL_FOCUS_IDX="$_saved_idx"
