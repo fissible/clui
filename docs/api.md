@@ -517,3 +517,71 @@ shellframe_app "_myapp" "ROOT"
 For a full real-world example see [`macbin/scripts`](https://github.com/fissible/macbin)
 — a three-screen app (action list → confirm → result alert) that manages
 symlinks in `~/bin`.
+
+---
+
+## `src/sheet.sh`
+
+Sheet navigation primitive — a partial overlay that sits above the current
+`shellframe_shell` screen. Row 1 is a frozen, dimmed snapshot of the underlying
+content (the "back strip"); rows 2+ are the sheet's own content. Supports
+wizard-style internal screen transitions and three dismissal paths.
+
+**Globals set before the render hook:**
+
+| Global | Description |
+|---|---|
+| `SHELLFRAME_SHEET_WIDTH` | Current terminal column count — use as the `width` argument in `shellframe_shell_region` calls |
+| `SHELLFRAME_SHEET_HEIGHT` | Set this in your render hook to fix the sheet height (rows of content, not counting the back strip). `0` = fill to bottom of terminal |
+
+**Public API:**
+
+**`shellframe_sheet_push prefix screen`**
+
+Open a sheet. `prefix` is the hook namespace (e.g. `"_myapp"`); `screen` is the
+initial screen name (e.g. `"OPEN_DB"`). Returns 1 and prints a warning to
+stderr if a sheet is already active (stacking not supported in v1).
+
+**`shellframe_sheet_pop`**
+
+Schedule sheet dismissal — sets `_SHELLFRAME_SHEET_NEXT="__POP__"`. The sheet
+is torn down and the parent screen is restored on the next draw cycle.
+
+**`shellframe_sheet_active`**
+
+Returns exit code 0 if a sheet is currently active, 1 otherwise.
+
+**Hook convention** (identical to `shellframe_shell` screens):
+
+```bash
+# Layout — called each draw cycle. Register regions + set SHELLFRAME_SHEET_HEIGHT.
+# Row 1 = first content row (screen row 2, immediately below the back strip).
+PREFIX_SCREEN_render()
+
+# Region callbacks — same signatures as shellframe_shell regions.
+PREFIX_SCREEN_REGION_render  top left width height
+PREFIX_SCREEN_REGION_on_key  key        # return 0=handled, 1=unhandled, 2=action
+PREFIX_SCREEN_REGION_on_focus active
+PREFIX_SCREEN_REGION_action()           # called when on_key returns 2
+
+# Quit hook — called on Esc or Up-from-topmost. Pop the sheet here.
+PREFIX_SCREEN_quit()
+```
+
+**Navigation:**
+
+| Key | Behaviour |
+|---|---|
+| `Tab` / `Shift-Tab` | Cycle focus between sheet regions (always; not offered to region `on_key`) |
+| `Esc` | Call `PREFIX_SCREEN_quit` if defined, else `shellframe_sheet_pop` |
+| `Up` (unhandled, topmost region) | Same as Esc |
+
+**Wizard transitions** — set `_SHELLFRAME_SHEET_NEXT` in any action handler:
+
+```bash
+_myapp_STEP1_next_action() { _SHELLFRAME_SHEET_NEXT="STEP2"; }   # advance
+_myapp_STEP2_back_action() { _SHELLFRAME_SHEET_NEXT="STEP1"; }   # retreat
+_myapp_STEP2_quit()        { shellframe_sheet_pop; }              # dismiss
+```
+
+See [`examples/sheet.sh`](../examples/sheet.sh) for a complete two-step wizard.
