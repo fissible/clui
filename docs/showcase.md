@@ -530,3 +530,47 @@ shellframe_ac_on_key "$key" && return 0
 # ... field processes key ...
 shellframe_ac_on_key_after   # re-filter in auto mode
 ```
+
+---
+
+## Sheet Navigation
+
+A sheet is a partial overlay that sits above the current `shellframe_shell` screen. It:
+
+- Shows 1 frozen, dimmed row of the underlying screen at the top (the "back strip")
+- Renders its own content from row 2 downward, with configurable height
+- Supports internal screen transitions (wizard pattern) via `_SHELLFRAME_SHEET_NEXT`
+- Dismisses on Esc, Up from topmost focusable region, or `shellframe_sheet_pop`
+
+### Quick start
+
+```bash
+source shellframe.sh
+
+# Push a sheet from any shellframe_shell event handler:
+_myapp_ROOT_open_action() {
+    shellframe_sheet_push "_myapp" "OPEN_DB"
+}
+
+# Sheet screen hooks — identical convention to shellframe_shell screens.
+# Row 1 = first content row (screen row 2, below the back strip).
+# Use $SHELLFRAME_SHEET_WIDTH for the width argument.
+_myapp_OPEN_DB_render() {
+    SHELLFRAME_SHEET_HEIGHT=7
+    shellframe_shell_region body   1 1 "$SHELLFRAME_SHEET_WIDTH" 6
+    shellframe_shell_region footer 7 1 "$SHELLFRAME_SHEET_WIDTH" 1 nofocus
+}
+
+_myapp_OPEN_DB_body_render() { shellframe_form_render "db" "$@"; }
+_myapp_OPEN_DB_body_on_key()  { shellframe_form_on_key "db" "$1"; }
+
+_myapp_OPEN_DB_quit() { shellframe_sheet_pop; }
+
+# Wizard transition (set _SHELLFRAME_SHEET_NEXT in any action handler):
+_myapp_OPEN_DB_body_action() { _SHELLFRAME_SHEET_NEXT="CONFIRM"; }
+```
+
+### Known limitations (v1)
+
+- **Back-strip dimming is best-effort.** Frozen rows are wrapped in `\033[2m...\033[22m`. Rows containing `\033[0m` (full reset) mid-string will have dim cancelled at that point. Partial dimming is visually acceptable; full ANSI stripping is deferred to a future release.
+- **Stacking not supported.** Calling `shellframe_sheet_push` while a sheet is already active returns 1 and prints a warning to stderr. One sheet at a time.
