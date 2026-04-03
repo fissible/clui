@@ -87,6 +87,7 @@ _SF_ROW_PREV=()
 _SF_DIRTY_ROWS=()
 _SF_FRAME_ROWS=24
 _SF_FRAME_COLS=80
+_SF_ROW_OFFSET=0  # Set by sheet.sh during region dispatch; 0 = no offset
 
 # shellframe_fb_frame_start rows cols
 #   Reset CURR and DIRTY for a new draw cycle.  PREV is untouched — it holds
@@ -101,33 +102,36 @@ shellframe_fb_frame_start() {
 # shellframe_fb_put row col cell
 #   Append a positioned single-cell fragment at (row, col).
 shellframe_fb_put() {
+    local _r=$(( $1 + _SF_ROW_OFFSET ))
     local _frag
-    printf -v _frag '\033[%d;%dH%s' "$1" "$2" "$3"
-    _SF_ROW_CURR[$1]+="$_frag"
-    _SF_DIRTY_ROWS[$1]=1
+    printf -v _frag '\033[%d;%dH%s' "$_r" "$2" "$3"
+    _SF_ROW_CURR[$_r]+="$_frag"
+    _SF_DIRTY_ROWS[$_r]=1
 }
 
 # shellframe_fb_print row col str [prefix]
 #   Append a positioned string fragment at (row, col).
 #   prefix is prepended once (e.g. an ANSI highlight sequence).
 shellframe_fb_print() {
+    local _r=$(( $1 + _SF_ROW_OFFSET ))
     local _frag
-    printf -v _frag '\033[%d;%dH%s%s' "$1" "$2" "${4:-}" "$3"
-    _SF_ROW_CURR[$1]+="$_frag"
-    _SF_DIRTY_ROWS[$1]=1
+    printf -v _frag '\033[%d;%dH%s%s' "$_r" "$2" "${4:-}" "$3"
+    _SF_ROW_CURR[$_r]+="$_frag"
+    _SF_DIRTY_ROWS[$_r]=1
 }
 
 # shellframe_fb_fill row col n [char] [prefix]
 #   Append a positioned fill fragment: n copies of char (default: space).
 #   prefix is prepended once (e.g. a background colour sequence).
 shellframe_fb_fill() {
+    local _r=$(( $1 + _SF_ROW_OFFSET ))
     local _fill
     printf -v _fill '%*s' "$3" ''
     [[ "${4:- }" != " " ]] && _fill="${_fill// /${4}}"
     local _frag
-    printf -v _frag '\033[%d;%dH%s%s' "$1" "$2" "${5:-}" "$_fill"
-    _SF_ROW_CURR[$1]+="$_frag"
-    _SF_DIRTY_ROWS[$1]=1
+    printf -v _frag '\033[%d;%dH%s%s' "$_r" "$2" "${5:-}" "$_fill"
+    _SF_ROW_CURR[$_r]+="$_frag"
+    _SF_DIRTY_ROWS[$_r]=1
 }
 
 # shellframe_fb_print_ansi row col rendered_str
@@ -135,10 +139,11 @@ shellframe_fb_fill() {
 #   Unlike the old cell-based version, no per-character parsing is needed —
 #   the string is appended as-is with cursor positioning.
 shellframe_fb_print_ansi() {
+    local _r=$(( $1 + _SF_ROW_OFFSET ))
     local _frag
-    printf -v _frag '\033[%d;%dH%s' "$1" "$2" "$3"
-    _SF_ROW_CURR[$1]+="$_frag"
-    _SF_DIRTY_ROWS[$1]=1
+    printf -v _frag '\033[%d;%dH%s' "$_r" "$2" "$3"
+    _SF_ROW_CURR[$_r]+="$_frag"
+    _SF_DIRTY_ROWS[$_r]=1
 }
 
 # shellframe_screen_flush
