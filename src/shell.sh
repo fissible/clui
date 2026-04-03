@@ -496,6 +496,16 @@ shellframe_shell() {
             if (( ${_SHELLFRAME_SHEET_ACTIVE:-0} )); then
                 shellframe_sheet_on_key "$_key"
                 _shellframe_shell_draw_if_dirty "$_prefix" "$_current"
+                # An action inside the sheet may have set _SHELLFRAME_SHELL_NEXT
+                # (e.g. submit_action requesting __QUIT__). Check it here so the
+                # outer loop exits immediately rather than waiting for another key.
+                if [[ "${_SHELLFRAME_SHELL_NEXT:-}" == "__QUIT__" ]]; then
+                    _current="__QUIT__"; _screen_done=1
+                elif [[ -n "${_SHELLFRAME_SHELL_NEXT:-}" ]]; then
+                    _current="$_SHELLFRAME_SHELL_NEXT"
+                    _SHELLFRAME_SHELL_NEXT=""
+                    _screen_done=1
+                fi
                 continue
             fi
 
